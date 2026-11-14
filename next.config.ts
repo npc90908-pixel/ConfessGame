@@ -25,8 +25,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Long-lived caching for generated game assets (fonts, audio, textures).
-        source: "/:folder(fonts|audio|textures|particles|memories|images)/:path*",
+        // Long-lived caching for generated game assets (fonts, audio, textures, 3D models).
+        source: "/:folder(fonts|audio|textures|particles|memories|images|models)/:path*",
         headers: [
           {
             key: "Cache-Control",

@@ -3,13 +3,15 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { MODELS } from "@/config/models";
 import { createRng } from "@/lib/math";
 import { useQuality } from "@/game/systems/quality";
+import { Model, ModelInstances, placementsToInstances, splitPlacements, type MaterialOverrides } from "./Model";
 
 const tmpObj = new THREE.Object3D();
 const tmpColor = new THREE.Color();
 
-type Placement = { x: number; z: number; s: number; r: number; tint?: number };
+export type Placement = { x: number; z: number; s: number; r: number; tint?: number };
 
 export interface ScatterOptions {
   count: number;
@@ -21,10 +23,12 @@ export interface ScatterOptions {
   /** Minimum distance to these points (keeps paths & hubs clear). */
   avoid?: Array<[number, number, number]>;
   avoidRadius?: number;
+  /** Minimum spacing between placements of this scatter. */
+  spacing?: number;
 }
 
 /** Deterministic rejection-sampling scatter. */
-export function scatter({ count, seed, area, bounds, scale = [0.8, 1.3], avoid = [], avoidRadius = 2.5 }: ScatterOptions): Placement[] {
+export function scatter({ count, seed, area, bounds, scale = [0.8, 1.3], avoid = [], avoidRadius = 2.5, spacing = 0 }: ScatterOptions): Placement[] {
   const rng = createRng(seed);
   const out: Placement[] = [];
   let attempts = 0;
@@ -34,6 +38,7 @@ export function scatter({ count, seed, area, bounds, scale = [0.8, 1.3], avoid =
     const z = rng.range(bounds[2], bounds[3]);
     if (!area(x, z)) continue;
     if (avoid.some((p) => Math.hypot(p[0] - x, p[2] - z) < avoidRadius)) continue;
+    if (spacing > 0 && out.some((p) => Math.hypot(p.x - x, p.z - z) < spacing)) continue;
     out.push({ x, z, s: rng.range(scale[0], scale[1]), r: rng.range(0, Math.PI * 2), tint: rng.next() });
   }
   return out;
@@ -72,57 +77,47 @@ function useInstances(
 /*  Trees                                                                     */
 /* -------------------------------------------------------------------------- */
 
+export type TreeVariant = "round" | "pine" | "willow" | "palm" | "fall";
+
+const LEAF_MATERIALS = ["leafsGreen", "leafsDark", "leafsFall"];
+const BARK_MATERIALS = ["woodBark", "woodBarkDark", "woodBirch"];
+
+const TREE_SETS: Record<TreeVariant, { urls: string[]; scale: number }> = {
+  round: { urls: [MODELS.natTreeOak, MODELS.natTreeFat, MODELS.natTreeDefault, MODELS.natTreeDetailed], scale: 3.1 },
+  pine: { urls: [MODELS.natTreePineDefaultA, MODELS.natTreePineRoundA, MODELS.natTreePineTallADetailed, MODELS.natTreePineSmallA], scale: 2.9 },
+  willow: { urls: [MODELS.natTreePlateau, MODELS.natTreeTall, MODELS.natTreeThin, MODELS.natTreeSimple], scale: 3 },
+  palm: { urls: [MODELS.natTreePalmDetailedTall, MODELS.natTreePalmBend], scale: 3 },
+  fall: { urls: [MODELS.natTreeOakFall, MODELS.natTreeDetailedFall, MODELS.natTreeFatFall], scale: 3.1 },
+};
+
 export interface TreesProps {
   placements: Placement[];
   getHeight: (x: number, z: number) => number;
   trunkColor?: string;
   leafColors?: string[];
-  /** "round" blossom trees or "pine" cones. */
-  variant?: "round" | "pine" | "willow";
+  variant?: TreeVariant;
   castShadow?: boolean;
+  /** Extra multiplier on the kit's natural size. */
+  scale?: number;
 }
 
-/** Instanced stylised trees (trunk + 2 canopy layers). */
-export function Trees({ placements, getHeight, trunkColor = "#4a3552", leafColors = ["#4f8f6a", "#3e7a5b", "#5f9f72"], variant = "round", castShadow = true }: TreesProps) {
-  const trunk = useRef<THREE.InstancedMesh>(null);
-  const canopyA = useRef<THREE.InstancedMesh>(null);
-  const canopyB = useRef<THREE.InstancedMesh>(null);
-  const { preset } = useQuality();
-  const shadows = castShadow && preset.shadows;
-
-  useInstances(trunk, placements, getHeight, 1.1);
-  useInstances(canopyA, placements, getHeight, variant === "pine" ? 2.6 : 2.9, leafColors, variant === "round" ? 0.25 : 0);
-  useInstances(canopyB, placements, getHeight, variant === "pine" ? 3.7 : 3.7, leafColors, variant === "round" ? 0.25 : 0);
-
-  const canopyGeo = useMemo(() => {
-    if (variant === "pine") return new THREE.ConeGeometry(1.4, 2.4, 7);
-    if (variant === "willow") return new THREE.SphereGeometry(1.5, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.75);
-    return new THREE.IcosahedronGeometry(1.5, 1);
-  }, [variant]);
-  const canopyGeoB = useMemo(() => {
-    if (variant === "pine") return new THREE.ConeGeometry(1.05, 2, 7);
-    if (variant === "willow") return new THREE.SphereGeometry(1.1, 8, 6);
-    return new THREE.IcosahedronGeometry(1.05, 1);
-  }, [variant]);
-
+/** Instanced Kenney trees — several model variants, palette-tinted leaves. */
+export function Trees({ placements, getHeight, trunkColor = "#6b4a3a", leafColors = ["#4f8f6a", "#3e7a5b", "#5f9f72"], variant = "round", castShadow = true, scale = 1 }: TreesProps) {
+  const set = TREE_SETS[variant];
+  const buckets = useMemo(() => splitPlacements(placements, set.urls.length), [placements, set.urls.length]);
+  const overrides = useMemo<MaterialOverrides>(() => Object.fromEntries(BARK_MATERIALS.map((m) => [m, { color: trunkColor }])), [trunkColor]);
+  const instanceSets = useMemo(() => buckets.map((b) => placementsToInstances(b, { getHeight, colors: leafColors })), [buckets, getHeight, leafColors]);
   return (
     <group>
-      <instancedMesh ref={trunk} args={[undefined, undefined, placements.length]} castShadow={shadows} receiveShadow>
-        <cylinderGeometry args={[0.16, 0.3, 2.3, 7]} />
-        <meshStandardMaterial color={trunkColor} roughness={0.95} />
-      </instancedMesh>
-      <instancedMesh ref={canopyA} args={[canopyGeo, undefined, placements.length]} castShadow={shadows}>
-        <meshStandardMaterial roughness={0.85} flatShading />
-      </instancedMesh>
-      <instancedMesh ref={canopyB} args={[canopyGeoB, undefined, placements.length]} castShadow={shadows}>
-        <meshStandardMaterial roughness={0.85} flatShading />
-      </instancedMesh>
+      {set.urls.map((url, i) => (
+        <ModelInstances key={url} url={url} instances={instanceSets[i]} scale={set.scale * scale} overrides={overrides} tintMaterials={LEAF_MATERIALS} castShadow={castShadow} />
+      ))}
     </group>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Grass / flowers / rocks                                                   */
+/*  Grass / flowers / bushes / rocks                                          */
 /* -------------------------------------------------------------------------- */
 
 /** Instanced grass tufts that sway in the wind (vertex shader via onBeforeCompile). */
@@ -158,35 +153,55 @@ export function GrassTufts({ placements, getHeight, color = "#5fa877", height = 
   return <instancedMesh ref={ref} args={[geometry, material, placements.length]} receiveShadow />;
 }
 
-/** Small instanced flowers (stem + coloured head). */
-export function FlowerField({ placements, getHeight, colors = ["#ff8fb8", "#ffd1e3", "#f3d08a", "#b9a7ff", "#ffffff"] }: { placements: Placement[]; getHeight: (x: number, z: number) => number; colors?: string[] }) {
-  const stems = useRef<THREE.InstancedMesh>(null);
-  const heads = useRef<THREE.InstancedMesh>(null);
-  useInstances(stems, placements, getHeight, 0.2);
-  useInstances(heads, placements, getHeight, 0.42, colors);
+const FLOWER_URLS = [MODELS.natFlowerPurpleA, MODELS.natFlowerRedA, MODELS.natFlowerYellowA, MODELS.natFlowerPurpleB, MODELS.natFlowerRedB, MODELS.natFlowerYellowB, MODELS.natFlowerPurpleC, MODELS.natFlowerRedC, MODELS.natFlowerYellowC];
+const PETAL_MATERIALS = ["colorPurple", "colorRed", "colorYellow"];
+
+/** Instanced Kenney flowers with palette-tinted petals. */
+export function FlowerField({ placements, getHeight, colors = ["#ff8fb8", "#ffd1e3", "#f3d08a", "#b9a7ff", "#ffffff"], stemColor = "#3f7a4e", scale = 1 }: { placements: Placement[]; getHeight: (x: number, z: number) => number; colors?: string[]; stemColor?: string; scale?: number }) {
+  const buckets = useMemo(() => splitPlacements(placements, FLOWER_URLS.length), [placements]);
+  const overrides = useMemo<MaterialOverrides>(() => ({ grass: { color: stemColor } }), [stemColor]);
+  const instanceSets = useMemo(() => buckets.map((b) => placementsToInstances(b, { getHeight, colors })), [buckets, getHeight, colors]);
   return (
     <group>
-      <instancedMesh ref={stems} args={[undefined, undefined, placements.length]}>
-        <cylinderGeometry args={[0.02, 0.03, 0.4, 4]} />
-        <meshStandardMaterial color="#3f7a4e" roughness={1} />
-      </instancedMesh>
-      <instancedMesh ref={heads} args={[undefined, undefined, placements.length]}>
-        <dodecahedronGeometry args={[0.11, 0]} />
-        <meshStandardMaterial roughness={0.6} emissiveIntensity={0.25} emissive="#ffffff" />
-      </instancedMesh>
+      {FLOWER_URLS.map((url, i) => (
+        <ModelInstances key={url} url={url} instances={instanceSets[i]} scale={2.2 * scale} overrides={overrides} tintMaterials={PETAL_MATERIALS} castShadow={false} />
+      ))}
     </group>
   );
 }
 
-/** Instanced low-poly rocks. */
-export function Rocks({ placements, getHeight, color = "#5a5270" }: { placements: Placement[]; getHeight: (x: number, z: number) => number; color?: string }) {
-  const ref = useRef<THREE.InstancedMesh>(null);
-  useInstances(ref, placements, getHeight, 0.1, undefined, 0.6);
+const BUSH_URLS = [MODELS.natPlantBush, MODELS.natPlantBushDetailed, MODELS.natPlantBushLarge];
+
+/** Instanced low bushes. */
+export function Bushes({ placements, getHeight, color = "#3f7a4e", scale = 1 }: { placements: Placement[]; getHeight: (x: number, z: number) => number; color?: string; scale?: number }) {
+  const buckets = useMemo(() => splitPlacements(placements, BUSH_URLS.length), [placements]);
+  const overrides = useMemo<MaterialOverrides>(() => ({ grass: { color } }), [color]);
+  const instanceSets = useMemo(() => buckets.map((b) => placementsToInstances(b, { getHeight })), [buckets, getHeight]);
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, placements.length]} castShadow receiveShadow>
-      <dodecahedronGeometry args={[0.5, 0]} />
-      <meshStandardMaterial color={color} roughness={1} flatShading />
-    </instancedMesh>
+    <group>
+      {BUSH_URLS.map((url, i) => (
+        <ModelInstances key={url} url={url} instances={instanceSets[i]} scale={2.6 * scale} overrides={overrides} castShadow={false} />
+      ))}
+    </group>
+  );
+}
+
+const ROCK_URLS = [MODELS.natRockLargeA, MODELS.natRockLargeC, MODELS.natRockTallB, MODELS.natRockTallD, MODELS.natStoneLargeB, MODELS.natStoneTallC, MODELS.natRockSmallFlatA];
+
+/** Instanced Kenney rocks and stones. */
+export function Rocks({ placements, getHeight, color = "#5a5270", mossColor, scale = 1 }: { placements: Placement[]; getHeight: (x: number, z: number) => number; color?: string; mossColor?: string; scale?: number }) {
+  const buckets = useMemo(() => splitPlacements(placements, ROCK_URLS.length), [placements]);
+  const overrides = useMemo<MaterialOverrides>(() => {
+    const dark = `#${new THREE.Color(color).multiplyScalar(0.78).getHexString()}`;
+    return { stone: { color }, dirt: { color }, stoneDark: { color: dark }, grass: { color: mossColor ?? dark } };
+  }, [color, mossColor]);
+  const instanceSets = useMemo(() => buckets.map((b) => placementsToInstances(b, { getHeight, yOffset: -0.05 })), [buckets, getHeight]);
+  return (
+    <group>
+      {ROCK_URLS.map((url, i) => (
+        <ModelInstances key={url} url={url} instances={instanceSets[i]} scale={1.3 * scale} overrides={overrides} />
+      ))}
+    </group>
   );
 }
 
@@ -210,28 +225,35 @@ export function Crystals({ placements, getHeight, color = "#b9a7ff" }: { placeme
 /*  Lanterns                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** A stone lantern post with a warm emissive cage. Real light optional. */
-export function Lantern({ position, color = "#ffd27a", light = false, height = 2.2 }: { position: [number, number, number]; color?: string; light?: boolean; height?: number }) {
+export type LanternStyle = "post" | "double" | "hanging" | "stone";
+
+const LANTERN_MODELS: Record<LanternStyle, { url: string; scale: number; glows: Array<[number, number, number]>; glowSize: [number, number, number] }> = {
+  post: { url: MODELS.graveLightpostSingle, scale: 2, glows: [[-0.14, 1.03, 0]], glowSize: [0.17, 0.2, 0.17] },
+  double: { url: MODELS.graveLightpostDouble, scale: 2, glows: [[-0.15, 1.03, 0], [0.15, 1.03, 0]], glowSize: [0.17, 0.2, 0.17] },
+  hanging: { url: MODELS.holidayLanternHanging, scale: 2.2, glows: [[0, -0.36, 0]], glowSize: [0.17, 0.2, 0.17] },
+  stone: { url: MODELS.townLantern, scale: 1.8, glows: [[0, 1.42, 0]], glowSize: [0.15, 0.2, 0.15] },
+};
+
+/** A lamp post (Kenney model) with a warm flickering glow. Real light optional. */
+export function Lantern({ position, color = "#ffd27a", light = false, style = "post", rotationY = 0, scale = 1 }: { position: [number, number, number]; color?: string; light?: boolean; style?: LanternStyle; rotationY?: number; scale?: number }) {
   const glow = useRef<THREE.MeshStandardMaterial>(null);
   const seed = useMemo(() => position[0] * 1.7 + position[2] * 0.9, [position]);
+  const { preset } = useQuality();
+  const def = LANTERN_MODELS[style];
   useFrame(({ clock }) => {
-    if (glow.current) glow.current.emissiveIntensity = 1.8 + Math.sin(clock.elapsedTime * 3 + seed) * 0.35;
+    if (glow.current) glow.current.emissiveIntensity = 2 + Math.sin(clock.elapsedTime * 3 + seed) * 0.4 + Math.sin(clock.elapsedTime * 7.3 + seed) * 0.15;
   });
+  const s = def.scale * scale;
   return (
-    <group position={position}>
-      <mesh position={[0, height / 2, 0]} castShadow>
-        <cylinderGeometry args={[0.06, 0.1, height, 6]} />
-        <meshStandardMaterial color="#3a3048" roughness={0.9} />
-      </mesh>
-      <mesh position={[0, height + 0.18, 0]} castShadow>
-        <boxGeometry args={[0.34, 0.4, 0.34]} />
-        <meshStandardMaterial ref={glow} color={color} emissive={color} emissiveIntensity={1.8} roughness={0.4} transparent opacity={0.9} />
-      </mesh>
-      <mesh position={[0, height + 0.45, 0]}>
-        <coneGeometry args={[0.32, 0.22, 4]} />
-        <meshStandardMaterial color="#2a2238" roughness={0.9} />
-      </mesh>
-      {light && <pointLight position={[0, height + 0.2, 0]} color={color} intensity={6} distance={9} decay={2} />}
+    <group position={position} rotation={[0, rotationY, 0]}>
+      <Model url={def.url} scale={s} castShadow={preset.shadows} />
+      {def.glows.map((g, i) => (
+        <mesh key={i} position={[g[0] * s, g[1] * s, g[2] * s]}>
+          <boxGeometry args={[def.glowSize[0] * s, def.glowSize[1] * s, def.glowSize[2] * s]} />
+          <meshStandardMaterial ref={i === 0 ? glow : undefined} color={color} emissive={color} emissiveIntensity={2} roughness={0.3} transparent opacity={0.85} />
+        </mesh>
+      ))}
+      {light && <pointLight position={[def.glows[0][0] * s, def.glows[0][1] * s, def.glows[0][2] * s]} color={color} intensity={6} distance={10} decay={2} />}
     </group>
   );
 }

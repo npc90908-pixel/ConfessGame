@@ -14,9 +14,11 @@ import { runtime } from "@/game/engine/runtime";
 import { circle, setWorld } from "@/game/engine/world";
 import { Collectible } from "@/game/objects/Collectible";
 import { GlowMarker, LightBeam } from "@/game/objects/GlowMarker";
+import { Model, preloadModels } from "@/game/objects/Model";
 import { Particles } from "@/game/objects/Particles";
 import { SkyDome, type SkyPalette } from "@/game/objects/SkyDome";
 import { Rocks, scatter } from "@/game/objects/Flora";
+import { MODELS } from "@/config/models";
 import { Water, waterHeightAt } from "@/game/objects/Water";
 import { audio } from "@/game/systems/audio/AudioManager";
 import { useQuality } from "@/game/systems/quality";
@@ -58,6 +60,27 @@ const SUNRISE = { top: new THREE.Color("#3a2a6a"), horizon: new THREE.Color("#ff
 const NIGHT_C = { top: new THREE.Color(NIGHT.top), horizon: new THREE.Color(NIGHT.horizon), bottom: new THREE.Color(NIGHT.bottom) };
 const FOG_NIGHT = new THREE.Color("#0a0a24");
 const FOG_SUNRISE = new THREE.Color("#8a4a6a");
+
+/** Derelict ships riding at anchor out on the water — scenery, but the boat can't sail through them. */
+const SHIPS = [
+  { x: -46, z: -44, ry: 0.6, scale: 2.2, url: MODELS.pirateShipSmall, r: 11 },
+  { x: 62, z: -126, ry: -2.3, scale: 2.6, url: MODELS.pirateShipMedium, r: 14 },
+] as const;
+
+/** Barrels, crates and palms on the little shore. */
+const SHORE_PROPS = [
+  { url: MODELS.pirateBarrel, x: 2.6, z: 5.2, ry: 0.4, scale: 1.1 },
+  { url: MODELS.pirateBarrel, x: 3.3, z: 6.1, ry: 1.9, scale: 1.1 },
+  { url: MODELS.pirateCrate, x: -2.9, z: 6.4, ry: 0.3, scale: 1.1 },
+  { url: MODELS.pirateChest, x: -3.4, z: 8.6, ry: 0.9, scale: 1 },
+  { url: MODELS.piratePalmDetailedStraight, x: -4.6, z: 12.2, ry: 0.2, scale: 1.5 },
+  { url: MODELS.piratePalmDetailedBend, x: 4.8, z: 12.8, ry: 2.4, scale: 1.4 },
+  { url: MODELS.piratePalmDetailedStraight, x: 0.6, z: 14.6, ry: 4.1, scale: 1.25 },
+  { url: MODELS.piratePatchSandFoliage, x: 2.2, z: 9.6, ry: 1.2, scale: 1.2 },
+  { url: MODELS.piratePatchGrassFoliage, x: -1.8, z: 10.4, ry: 2.8, scale: 1.2 },
+] as const;
+const SHORE_COLLIDERS = SHORE_PROPS.filter((p) => !p.url.includes("patch")).map((p) => circle(p.x, p.z, p.url.includes("palm") ? 0.45 : 0.6));
+const MODEL_URLS = [MODELS.pirateBoatRowLarge, ...SHIPS.map((s) => s.url), ...SHORE_PROPS.map((p) => p.url)];
 
 const BOAT_SCENES: SceneId[] = ["sail-with-me", "message-bottles", "star-puzzle", "beyond-horizon"];
 const boatStartFor = (id: SceneId): [number, number, number] => {
@@ -123,6 +146,7 @@ function Boat() {
       const blockers = [
         { x: SHORE.x, z: SHORE.z, r: SHORE.r + 1.5 },
         { x: OCEAN.shrine[0], z: OCEAN.shrine[2], r: SHRINE_ROCK_R + 2 },
+        ...SHIPS.map((sh) => ({ x: sh.x, z: sh.z, r: sh.r })),
       ];
       for (const bl of blockers) {
         const dx = fx2 - bl.x;
@@ -189,24 +213,13 @@ function Boat() {
 
   return (
     <group ref={group} onClick={(e) => (e.stopPropagation(), triggerInteraction("boat"))}>
-      {/* hull */}
-      <mesh castShadow receiveShadow>
-        <capsuleGeometry args={[0.9, 2.6, 6, 12]} />
-        <meshStandardMaterial color="#5a3a2a" roughness={0.85} />
+      {/* hull: Kenney row boat (bow points −z, matching the heading maths above) */}
+      <Model url={MODELS.pirateBoatRowLarge} scale={1.6} position={[0, -0.3, 0]} />
+      {/* invisible click target so tapping anywhere on the boat boards it */}
+      <mesh visible={false}>
+        <boxGeometry args={[2.2, 1.4, 4.6]} />
       </mesh>
-      <mesh position={[0, 0.25, 0]} scale={[0.86, 0.5, 0.92]}>
-        <capsuleGeometry args={[0.9, 2.6, 6, 12]} />
-        <meshStandardMaterial color="#2a1a14" roughness={0.9} />
-      </mesh>
-      <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 2.2, 1]}>
-        <torusGeometry args={[1.0, 0.09, 8, 28]} />
-        <meshStandardMaterial color="#8a5a3a" roughness={0.8} />
-      </mesh>
-      {/* bench + lantern pole at the bow */}
-      <mesh position={[0, 0.45, 0.2]}>
-        <boxGeometry args={[1.5, 0.08, 0.5]} />
-        <meshStandardMaterial color="#8a5a3a" roughness={0.8} />
-      </mesh>
+      {/* lantern pole at the bow */}
       <mesh position={[0, 1.2, -1.9]}>
         <cylinderGeometry args={[0.04, 0.05, 1.6, 6]} />
         <meshStandardMaterial color="#3a2a1a" />
@@ -245,6 +258,9 @@ function Shore() {
         <meshStandardMaterial color="#5f8a62" roughness={1} />
       </mesh>
       <Rocks placements={rocks} getHeight={getHeight} color="#5a5a74" />
+      {SHORE_PROPS.map((p, i) => (
+        <Model key={i} url={p.url} position={[p.x, getHeight(p.x, p.z) - 0.04, p.z]} rotation={[0, p.ry, 0]} scale={p.scale} />
+      ))}
       {/* pier */}
       {planks.map((z, i) => (
         <mesh key={i} position={[PIER.x, PIER.y - 0.06, z - 0.25]} receiveShadow castShadow>
@@ -369,6 +385,35 @@ function DistantIslands() {
   );
 }
 
+function AnchoredShips() {
+  const groups = useRef<Array<THREE.Group | null>>([]);
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    SHIPS.forEach((sh, i) => {
+      const g = groups.current[i];
+      if (!g) return;
+      const h = waterHeightAt(sh.x, sh.z, t);
+      g.position.y = h - 0.4;
+      g.rotation.set(Math.sin(t * 0.45 + i) * 0.012, sh.ry, Math.sin(t * 0.3 + i * 2) * 0.02);
+    });
+  });
+  return (
+    <group>
+      {SHIPS.map((sh, i) => (
+        <group key={i} ref={(el) => (groups.current[i] = el)} position={[sh.x, 0, sh.z]} rotation={[0, sh.ry, 0]}>
+          <Model url={sh.url} scale={sh.scale} castShadow={false} />
+          {/* a single stern lamp so the silhouettes read at night */}
+          <mesh position={[0, 3.2 * sh.scale, 3.6 * sh.scale]}>
+            <sphereGeometry args={[0.22, 10, 8]} />
+            <meshStandardMaterial color="#ffd27a" emissive="#ffd27a" emissiveIntensity={2.2} toneMapped={false} />
+          </mesh>
+          <pointLight position={[0, 3.2 * sh.scale, 3.6 * sh.scale]} color="#ffd27a" intensity={6} distance={18} decay={2} />
+        </group>
+      ))}
+    </group>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Environment                                                               */
 /* -------------------------------------------------------------------------- */
@@ -391,10 +436,11 @@ export default function OceanWorld() {
       id: "ocean",
       getHeight,
       isWalkable,
-      colliders: [circle(SHORE.x, SHORE.z + 2, 0.8)],
+      colliders: [circle(SHORE.x, SHORE.z + 2, 0.8), ...SHORE_COLLIDERS],
       mode: "walk",
       respawn: OCEAN.pierStart,
     });
+    preloadModels(MODEL_URLS);
     fx.oceanSunrise = useProgressStore.getState().completedScenes.includes("beyond-horizon") ? 1 : 0;
     game.notifyEnvironmentReady("ocean");
     return () => {
@@ -500,6 +546,7 @@ export default function OceanWorld() {
 
       <Shore />
       <Boat />
+      <AnchoredShips />
       <StarShrine active={sceneId === "star-puzzle"} onInteract={openPuzzle} />
       <DistantIslands />
 

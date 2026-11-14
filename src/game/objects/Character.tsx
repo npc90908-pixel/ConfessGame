@@ -1,13 +1,17 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
-import { useTexture } from "@react-three/drei";
+import { useEffect, useMemo, useRef } from "react";
+import { createPortal, useFrame } from "@react-three/fiber";
+import { useAnimations, useTexture } from "@react-three/drei";
 import * as THREE from "three";
+import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CONTROLS } from "@/config/controls";
 import { PARTICLES } from "@/config/assets";
+import { CHARACTER_MODELS, MODELS, type CharacterModelId } from "@/config/models";
 import { runtime } from "@/game/engine/runtime";
+import { useQuality } from "@/game/systems/quality";
 import { damp, lerp } from "@/lib/math";
+import { Model, useModel } from "./Model";
 
 export interface CharacterProps {
   /** When true (default) the character follows runtime.player every frame. */
@@ -18,66 +22,75 @@ export interface CharacterProps {
   /** Emit the lantern point light (disable where many lights exist). */
   lantern?: boolean;
   castShadow?: boolean;
+  /** Which Kenney mini-character to use. */
+  model?: CharacterModelId;
 }
 
-const COLORS = {
-  cloak: "#8d79dd",
-  cloakInner: "#5f4bb6",
-  tunic: "#c9bcff",
-  scarf: "#ff6fa3",
-  skin: "#f7d9c6",
-  hair: "#3b2a4f",
-  boots: "#3a2a4f",
-  lanternMetal: "#4a3a2a",
-  lanternGlass: "#ffd98a",
-  blush: "#ff9fb0",
-};
+/** The traveller's default look. */
+export const PLAYER_MODEL: CharacterModelId = "character-female-b";
+
+/** Kenney mini-characters are ~0.8 m tall; scale them to a readable 1.5 m. */
+const CHARACTER_SCALE = 1.85;
+
+const qBone = new THREE.Quaternion();
+const qRoot = new THREE.Quaternion();
+const qSwing = new THREE.Quaternion();
+const eSwing = new THREE.Euler();
+
+type Pose = "idle" | "walk" | "sprint" | "jump" | "fall" | "sit";
 
 /**
- * "The Traveller" — a stylised chibi explorer built from primitives with a
- * procedural animation rig (idle / walk / run / jump / sit). No external
- * model files are required, so it loads instantly and never breaks.
+ * "The Traveller" — an animated Kenney mini-character (CC0) driven by the
+ * player runtime: idle / walk / sprint / jump / fall / sit clips are
+ * cross-faded from the controller's speed and grounded state, and a small
+ * hanging lantern swings from the right hand.
  */
-export function Character({ driven = true, sitting: sittingProp = false, scale = 1, lantern = true, castShadow = true }: CharacterProps) {
+export function Character({ driven = true, sitting: sittingProp = false, scale = 1, lantern = true, castShadow = true, model = PLAYER_MODEL }: CharacterProps) {
   const root = useRef<THREE.Group>(null);
-  const body = useRef<THREE.Group>(null);
-  const head = useRef<THREE.Group>(null);
-  const armL = useRef<THREE.Group>(null);
-  const armR = useRef<THREE.Group>(null);
-  const legL = useRef<THREE.Group>(null);
-  const legR = useRef<THREE.Group>(null);
-  const scarfTail = useRef<THREE.Mesh>(null);
-  const cloak = useRef<THREE.Mesh>(null);
   const lanternRef = useRef<THREE.Group>(null);
   const lanternLight = useRef<THREE.PointLight>(null);
   const glow = useTexture(PARTICLES.glow);
+  const { preset } = useQuality();
+  const gltf = useModel(CHARACTER_MODELS[model]);
 
-  const state = useRef({ phase: 0, walk: 0, air: 0 });
+  const scene = useMemo(() => {
+    const s = cloneSkeleton(gltf.scene) as THREE.Group;
+    s.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        obj.frustumCulled = false;
+      }
+    });
+    return s;
+  }, [gltf.scene]);
+  const { actions, mixer } = useAnimations(gltf.animations, scene);
+  const shadows = castShadow && preset.shadows;
 
-  const materials = useMemo(
-    () => ({
-      cloak: new THREE.MeshStandardMaterial({ color: COLORS.cloak, roughness: 0.75, side: THREE.DoubleSide }),
-      tunic: new THREE.MeshStandardMaterial({ color: COLORS.tunic, roughness: 0.7 }),
-      scarf: new THREE.MeshStandardMaterial({ color: COLORS.scarf, roughness: 0.6, emissive: COLORS.scarf, emissiveIntensity: 0.12 }),
-      skin: new THREE.MeshStandardMaterial({ color: COLORS.skin, roughness: 0.65 }),
-      hair: new THREE.MeshStandardMaterial({ color: COLORS.hair, roughness: 0.55 }),
-      boots: new THREE.MeshStandardMaterial({ color: COLORS.boots, roughness: 0.8 }),
-      eye: new THREE.MeshBasicMaterial({ color: "#1b1226" }),
-      eyeShine: new THREE.MeshBasicMaterial({ color: "#ffffff" }),
-      blush: new THREE.MeshBasicMaterial({ color: COLORS.blush, transparent: true, opacity: 0.55 }),
-      lanternMetal: new THREE.MeshStandardMaterial({ color: COLORS.lanternMetal, roughness: 0.5, metalness: 0.6 }),
-      lanternGlass: new THREE.MeshStandardMaterial({
-        color: COLORS.lanternGlass,
-        emissive: COLORS.lanternGlass,
-        emissiveIntensity: 2.2,
-        roughness: 0.2,
-        transparent: true,
-        opacity: 0.9,
-      }),
-      shadow: new THREE.MeshBasicMaterial({ map: glow, color: "#000000", transparent: true, opacity: 0.38, depthWrite: false }),
-    }),
-    [glow],
-  );
+  useEffect(() => {
+    scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        obj.castShadow = shadows;
+        obj.receiveShadow = false;
+      }
+    });
+  }, [scene, shadows]);
+
+  // Hook the lantern onto the right arm bone so it swings with the walk cycle.
+  const lanternAnchor = useMemo(() => scene.getObjectByName("arm-right") ?? scene, [scene]);
+
+  const shadowMat = useMemo(() => new THREE.MeshBasicMaterial({ map: glow, color: "#000000", transparent: true, opacity: 0.38, depthWrite: false }), [glow]);
+
+  const state = useRef<{ pose: Pose | null; walk: number; air: number }>({ pose: null, walk: 0, air: 0 });
+
+  useEffect(() => {
+    const idle = actions.idle;
+    if (idle) {
+      idle.reset().play();
+      state.current.pose = "idle";
+    }
+    return () => {
+      mixer.stopAllAction();
+    };
+  }, [actions, mixer]);
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 1 / 30);
@@ -90,56 +103,53 @@ export function Character({ driven = true, sitting: sittingProp = false, scale =
     if (root.current && driven) {
       root.current.position.copy(p.position);
       root.current.rotation.y = p.yaw;
-      const sc = p.scale * scale;
-      root.current.scale.setScalar(sc);
+      root.current.scale.setScalar(p.scale * scale);
       root.current.visible = p.visible && p.mode !== "none";
     }
 
-    const targetWalk = sitting ? 0 : Math.min(1, p.speed / CONTROLS.player.walkSpeed);
+    const speed = driven ? p.speed : 0;
+    const grounded = driven ? p.grounded : true;
+    const targetWalk = sitting ? 0 : Math.min(1, speed / CONTROLS.player.walkSpeed);
     s.walk = lerp(s.walk, targetWalk, damp(10, dt));
-    const targetAir = sitting || p.grounded ? 0 : 1;
-    s.air = lerp(s.air, targetAir, damp(12, dt));
-    const stride = 2.2 + Math.min(1.4, p.speed / CONTROLS.player.walkSpeed) * 1.6;
-    if (!sitting) s.phase += p.speed * dt * stride * 0.9;
-    const w = s.walk;
-    const air = s.air;
-    const swing = Math.sin(s.phase);
+    s.air = lerp(s.air, sitting || grounded ? 0 : 1, damp(12, dt));
 
-    if (legL.current && legR.current) {
-      const sitAngle = sitting ? -1.45 : 0;
-      legL.current.rotation.x = lerp(swing * 0.85 * w + sitAngle, -0.7, air);
-      legR.current.rotation.x = lerp(-swing * 0.85 * w + sitAngle, 0.35, air);
+    let pose: Pose;
+    if (sitting) pose = "sit";
+    else if (!grounded) pose = p.velocity.y > 0.5 ? "jump" : "fall";
+    else if (speed > CONTROLS.player.walkSpeed * 1.15) pose = "sprint";
+    else if (speed > 0.35) pose = "walk";
+    else pose = "idle";
+
+    if (pose !== s.pose) {
+      const next = actions[pose] ?? actions.idle;
+      const prev = s.pose ? actions[s.pose] : null;
+      if (next) {
+        next.reset();
+        next.enabled = true;
+        if (pose === "jump" || pose === "sit") {
+          next.setLoop(THREE.LoopOnce, 1);
+          next.clampWhenFinished = true;
+        } else {
+          next.setLoop(THREE.LoopRepeat, Infinity);
+        }
+        if (prev && prev !== next) prev.fadeOut(0.18);
+        next.fadeIn(0.18).play();
+      }
+      s.pose = pose;
     }
-    if (armL.current && armR.current) {
-      const idleSway = Math.sin(t * 1.4) * 0.06;
-      const sitArm = sitting ? 0.5 : 0;
-      armL.current.rotation.x = lerp(-swing * 0.7 * w + idleSway + sitArm, -2.3, air);
-      armR.current.rotation.x = lerp(swing * 0.7 * w - idleSway + sitArm, -2.3, air);
-      armL.current.rotation.z = 0.18 + w * 0.05;
-      armR.current.rotation.z = -0.18 - w * 0.05;
-    }
-    if (body.current) {
-      const bob = Math.abs(Math.sin(s.phase)) * 0.055 * w + Math.sin(t * 2.1) * 0.012;
-      body.current.position.y = 0.46 + bob - air * 0.05;
-      body.current.rotation.x = lerp(0.14 * w, -0.1, air);
-      body.current.rotation.z = Math.sin(s.phase * 0.5) * 0.03 * w;
-    }
-    if (head.current) {
-      head.current.rotation.y = Math.sin(t * 0.7) * 0.1 * (1 - w) ;
-      head.current.rotation.z = Math.sin(t * 1.1) * 0.03;
-      head.current.rotation.x = -0.05 * w;
-    }
-    if (scarfTail.current) {
-      scarfTail.current.rotation.x = -0.35 - w * 0.9 + Math.sin(t * 6) * 0.12 * w + Math.sin(t * 1.8) * 0.08;
-      scarfTail.current.rotation.z = Math.sin(t * 2.3) * 0.1;
-    }
-    if (cloak.current) {
-      cloak.current.rotation.x = -0.05 - w * 0.22 + Math.sin(t * 2) * 0.02;
-      cloak.current.scale.z = 1 + w * 0.08 + air * 0.2;
-    }
-    if (lanternRef.current) {
-      lanternRef.current.rotation.z = Math.sin(t * 2.6 + s.phase) * 0.18 * (0.35 + w);
-      lanternRef.current.rotation.x = Math.sin(t * 1.7) * 0.08;
+    // Feet follow the actual ground speed instead of sliding.
+    const walk = actions.walk;
+    if (walk) walk.timeScale = THREE.MathUtils.clamp(speed / 2.6, 0.6, 1.9);
+    const sprint = actions.sprint;
+    if (sprint) sprint.timeScale = THREE.MathUtils.clamp(speed / 4.6, 0.8, 1.6);
+
+    if (lanternRef.current && root.current) {
+      // Keep the lantern hanging upright from the swinging arm bone, plus a little pendulum motion.
+      eSwing.set(Math.sin(t * 1.7) * 0.1 + s.walk * 0.25, 0, Math.sin(t * 2.6) * 0.18 * (0.35 + s.walk) + Math.sin(t * 1.3) * 0.05);
+      qSwing.setFromEuler(eSwing);
+      lanternAnchor.getWorldQuaternion(qBone);
+      root.current.getWorldQuaternion(qRoot);
+      lanternRef.current.quaternion.copy(qBone).invert().multiply(qRoot).multiply(qSwing);
     }
     if (lanternLight.current) {
       lanternLight.current.intensity = 7 + Math.sin(t * 9) * 0.6 + Math.sin(t * 23) * 0.3;
@@ -149,116 +159,24 @@ export function Character({ driven = true, sitting: sittingProp = false, scale =
   return (
     <group ref={root} dispose={null}>
       {/* contact shadow blob */}
-      <mesh rotation-x={-Math.PI / 2} position-y={0.03} material={materials.shadow} renderOrder={-1}>
+      <mesh rotation-x={-Math.PI / 2} position-y={0.03} material={shadowMat} renderOrder={-1}>
         <planeGeometry args={[1.3, 1.3]} />
       </mesh>
-
-      {/* legs */}
-      <group ref={legL} position={[-0.11, 0.46, 0]}>
-        <mesh position-y={-0.2} material={materials.tunic} castShadow={castShadow}>
-          <capsuleGeometry args={[0.085, 0.24, 6, 12]} />
-        </mesh>
-        <mesh position={[0, -0.4, 0.04]} material={materials.boots} castShadow={castShadow}>
-          <boxGeometry args={[0.17, 0.12, 0.26]} />
-        </mesh>
+      <group scale={CHARACTER_SCALE}>
+        <primitive object={scene} />
       </group>
-      <group ref={legR} position={[0.11, 0.46, 0]}>
-        <mesh position-y={-0.2} material={materials.tunic} castShadow={castShadow}>
-          <capsuleGeometry args={[0.085, 0.24, 6, 12]} />
-        </mesh>
-        <mesh position={[0, -0.4, 0.04]} material={materials.boots} castShadow={castShadow}>
-          <boxGeometry args={[0.17, 0.12, 0.26]} />
-        </mesh>
-      </group>
-
-      {/* torso group (bobs) */}
-      <group ref={body} position-y={0.46}>
-        <mesh position-y={0.28} material={materials.tunic} castShadow={castShadow}>
-          <capsuleGeometry args={[0.23, 0.3, 8, 16]} />
-        </mesh>
-        {/* cloak */}
-        <mesh ref={cloak} position={[0, 0.2, -0.02]} material={materials.cloak} castShadow={castShadow}>
-          <coneGeometry args={[0.4, 0.78, 20, 1, true]} />
-        </mesh>
-        {/* scarf */}
-        <mesh position-y={0.6} rotation-x={Math.PI / 2} material={materials.scarf} castShadow={castShadow}>
-          <torusGeometry args={[0.2, 0.075, 10, 20]} />
-        </mesh>
-        <mesh ref={scarfTail} position={[0.08, 0.56, -0.2]} material={materials.scarf}>
-          <planeGeometry args={[0.14, 0.48]} />
-        </mesh>
-
-        {/* arms */}
-        <group ref={armL} position={[-0.3, 0.5, 0]}>
-          <mesh position-y={-0.17} material={materials.cloak} castShadow={castShadow}>
-            <capsuleGeometry args={[0.07, 0.26, 6, 12]} />
+      {/* Lantern hooked to the right arm bone so it swings with the animation (model units: parent scales 1.85×). */}
+      {createPortal(
+        <group ref={lanternRef} position={[-0.2, -0.01, 0.02]}>
+          <Model url={MODELS.holidayLanternHanging} scale={0.3} castShadow={false} receiveShadow={false} />
+          <mesh position={[0, -0.11, 0]}>
+            <boxGeometry args={[0.06, 0.07, 0.06]} />
+            <meshStandardMaterial color="#ffd98a" emissive="#ffd98a" emissiveIntensity={2.4} roughness={0.2} transparent opacity={0.9} />
           </mesh>
-          <mesh position-y={-0.36} material={materials.skin}>
-            <sphereGeometry args={[0.075, 12, 12]} />
-          </mesh>
-        </group>
-        <group ref={armR} position={[0.3, 0.5, 0]}>
-          <mesh position-y={-0.17} material={materials.cloak} castShadow={castShadow}>
-            <capsuleGeometry args={[0.07, 0.26, 6, 12]} />
-          </mesh>
-          <mesh position-y={-0.36} material={materials.skin}>
-            <sphereGeometry args={[0.075, 12, 12]} />
-          </mesh>
-          {/* lantern */}
-          <group ref={lanternRef} position={[0.02, -0.42, 0.06]}>
-            <mesh position-y={-0.08} material={materials.lanternMetal}>
-              <cylinderGeometry args={[0.02, 0.02, 0.1, 6]} />
-            </mesh>
-            <mesh position-y={-0.26} material={materials.lanternMetal}>
-              <cylinderGeometry args={[0.1, 0.12, 0.05, 8]} />
-            </mesh>
-            <mesh position-y={-0.2} material={materials.lanternGlass}>
-              <cylinderGeometry args={[0.07, 0.085, 0.14, 8]} />
-            </mesh>
-            <mesh position-y={-0.1} material={materials.lanternMetal}>
-              <cylinderGeometry args={[0.03, 0.11, 0.06, 8]} />
-            </mesh>
-            {lantern && (
-              <pointLight ref={lanternLight} position-y={-0.2} color="#ffcf7a" intensity={7} distance={7} decay={2} />
-            )}
-          </group>
-        </group>
-
-        {/* head */}
-        <group ref={head} position-y={0.92}>
-          <mesh material={materials.skin} castShadow={castShadow}>
-            <sphereGeometry args={[0.3, 28, 20]} />
-          </mesh>
-          {/* hair cap tilted backwards so the face stays visible */}
-          <mesh position={[0, 0.06, -0.03]} rotation-x={-0.55} material={materials.hair} castShadow={castShadow}>
-            <sphereGeometry args={[0.325, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
-          </mesh>
-          {/* fringe */}
-          <mesh position={[0.12, 0.17, 0.22]} rotation={[0.5, 0.3, 0.4]} material={materials.hair}>
-            <capsuleGeometry args={[0.05, 0.12, 4, 8]} />
-          </mesh>
-          {/* eyes */}
-          <mesh position={[-0.105, 0.02, 0.27]} material={materials.eye}>
-            <sphereGeometry args={[0.038, 12, 12]} />
-          </mesh>
-          <mesh position={[0.105, 0.02, 0.27]} material={materials.eye}>
-            <sphereGeometry args={[0.038, 12, 12]} />
-          </mesh>
-          <mesh position={[-0.092, 0.035, 0.302]} material={materials.eyeShine}>
-            <sphereGeometry args={[0.012, 8, 8]} />
-          </mesh>
-          <mesh position={[0.118, 0.035, 0.302]} material={materials.eyeShine}>
-            <sphereGeometry args={[0.012, 8, 8]} />
-          </mesh>
-          {/* blush */}
-          <mesh position={[-0.18, -0.06, 0.22]} rotation-y={-0.5} material={materials.blush}>
-            <circleGeometry args={[0.045, 12]} />
-          </mesh>
-          <mesh position={[0.18, -0.06, 0.22]} rotation-y={0.5} material={materials.blush}>
-            <circleGeometry args={[0.045, 12]} />
-          </mesh>
-        </group>
-      </group>
+          {lantern && <pointLight ref={lanternLight} position={[0, -0.11, 0.08]} color="#ffcf7a" intensity={7} distance={7} decay={2} />}
+        </group>,
+        lanternAnchor,
+      )}
     </group>
   );
 }

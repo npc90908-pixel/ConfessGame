@@ -6,6 +6,8 @@ import * as THREE from "three";
 import { triggerInteraction, useInteractable } from "@/game/engine/interactions";
 import { useProgressStore } from "@/store/progressStore";
 import type { IconName } from "@/types/game";
+import { MODELS } from "@/config/models";
+import { Model } from "./Model";
 import { Particles } from "./Particles";
 
 export type CollectibleShape = "orb" | "flower" | "key" | "bottle" | "star" | "heart";
@@ -125,55 +127,24 @@ function Shape({ shape, color }: { shape: CollectibleShape; color: string }) {
       );
     case "key":
       return (
-        <group rotation={[0, 0, Math.PI / 5]}>
-          <mesh position={[0, 0.25, 0]}>
-            <torusGeometry args={[0.2, 0.06, 10, 24]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} metalness={0.8} roughness={0.25} />
-          </mesh>
-          <mesh position={[0, -0.18, 0]}>
-            <cylinderGeometry args={[0.05, 0.05, 0.6, 8]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.7} metalness={0.8} roughness={0.25} />
-          </mesh>
-          <mesh position={[0.1, -0.4, 0]}>
-            <boxGeometry args={[0.18, 0.08, 0.06]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.7} metalness={0.8} roughness={0.25} />
-          </mesh>
-          <mesh position={[0.08, -0.28, 0]}>
-            <boxGeometry args={[0.14, 0.08, 0.06]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.7} metalness={0.8} roughness={0.25} />
-          </mesh>
+        <group rotation={[0.35, 0, Math.PI / 5]}>
+          <Model url={MODELS.platKey} scale={1.7} position={[0, -0.18, 0]} overrides={{ colormap: { color, emissive: color, emissiveIntensity: 0.45, roughness: 0.35, metalness: 0.4 } }} castShadow={false} receiveShadow={false} />
         </group>
       );
     case "bottle":
       return (
         <group rotation={[0.3, 0, 0.5]}>
-          <mesh>
-            <cylinderGeometry args={[0.16, 0.18, 0.6, 12]} />
-            <meshPhysicalMaterial color="#9ad7ff" transmission={0.6} thickness={0.5} roughness={0.15} transparent opacity={0.85} />
-          </mesh>
-          <mesh position={[0, 0.42, 0]}>
-            <cylinderGeometry args={[0.07, 0.1, 0.25, 10]} />
-            <meshPhysicalMaterial color="#9ad7ff" transmission={0.6} thickness={0.5} roughness={0.15} transparent opacity={0.85} />
-          </mesh>
-          <mesh position={[0, 0.58, 0]}>
-            <cylinderGeometry args={[0.08, 0.08, 0.12, 8]} />
-            <meshStandardMaterial color="#8a6a4a" roughness={0.9} />
-          </mesh>
-          <mesh rotation={[0, 0, 0.2]}>
-            <cylinderGeometry args={[0.07, 0.07, 0.42, 8]} />
+          <Model url={MODELS.pirateBottle} scale={0.9} position={[0, -0.4, 0]} overrides={{ colormap: { emissive: "#9ad7ff", emissiveIntensity: 0.25, roughness: 0.2 } }} castShadow={false} receiveShadow={false} />
+          <mesh position={[0, 0, 0]} rotation={[0, 0, 0.2]}>
+            <cylinderGeometry args={[0.06, 0.06, 0.36, 8]} />
             <meshStandardMaterial color="#fff4dc" emissive="#ffe6b0" emissiveIntensity={0.6} roughness={0.9} />
           </mesh>
         </group>
       );
     case "star":
-      return (
-        <mesh>
-          <octahedronGeometry args={[0.3, 0]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.6} roughness={0.2} />
-        </mesh>
-      );
+      return <Model url={MODELS.platStar} scale={1.6} position={[0, -0.28, 0]} overrides={{ colormap: { color, emissive: color, emissiveIntensity: 1.1, roughness: 0.3 } }} castShadow={false} receiveShadow={false} />;
     case "heart":
-      return <HeartMesh color={color} scale={0.32} />;
+      return <Model url={MODELS.platHeart} scale={0.75} position={[0, -0.25, 0]} overrides={{ colormap: { color, emissive: color, emissiveIntensity: 0.9, roughness: 0.25 } }} castShadow={false} receiveShadow={false} />;
     case "orb":
     default:
       return (

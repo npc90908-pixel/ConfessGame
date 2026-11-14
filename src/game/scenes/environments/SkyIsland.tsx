@@ -177,7 +177,7 @@ function Islets() {
       {islets.map((i) => (
         <group key={i.seed}>
           <FloatingIsland radius={i.r} getHeight={flat} depth={i.r * 1.6} seed={i.seed} position={i.pos} rings={8} receiveShadow={false} topColor="#3a6e52" />
-          <Lantern position={[i.pos[0], i.pos[1], i.pos[2]]} color={LIGHT_COLORS[i.seed % 3]} height={1.4} />
+          <Lantern position={[i.pos[0], i.pos[1], i.pos[2]]} color={LIGHT_COLORS[i.seed % 3]} style="stone" scale={0.9} />
         </group>
       ))}
     </group>

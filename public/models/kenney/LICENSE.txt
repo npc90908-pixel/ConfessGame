@@ -1,0 +1,4 @@
+All models in this folder are from Kenney's game-asset library (https://kenney.nl),
+released under Creative Commons Zero (CC0) — https://creativecommons.org/publicdomain/zero/1.0/
+Kits used: mini-characters, castle, nature, fantasy-town, graveyard, pirate, platformer, holiday.
+Support the artist: https://kenney.nl/donate
