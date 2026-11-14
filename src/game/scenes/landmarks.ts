@@ -62,27 +62,33 @@ export const OCEAN = {
 };
 
 export const CASTLE = {
-  halfSize: 24,
-  spawn: [0, 0, 26] as Vec3,
-  gate: [0, 0, -17] as Vec3,
-  facadeZ: -20,
+  /** Half extent of the grounds (ground mesh / scatter bounds). */
+  halfSize: 70,
+  /** Forest clearing south of the moat. */
+  spawn: [0, 0, 54] as Vec3,
+  /** Objective marker in front of the sealed keep gate. */
+  gate: [0, 0, -23] as Vec3,
+  /** Centre of the always-open outer gatehouse. */
+  outerGate: [0, 0, 33] as Vec3,
+  /** Keep facade (the sealed gate sits in it). */
+  facadeZ: -27,
   keys: [
-    [-18, 0, -6], // beside the west tower
-    [12, 0, 9], // fountain rim
-    [19, 0, -13], // east garden steps
+    [-18, 0, 11.5], // inside the west parterre, by the ring statue
+    [20, 0, 17], // east of the fountain plaza
+    [20, 0, -11.5], // inside the east shrine
   ] as Vec3[],
-  fountain: [12, 0, 9] as Vec3,
-  chamberCenter: [0, 0, -30] as Vec3,
-  chamberHalf: { w: 11, d: 8 },
+  fountain: [14, 0, 8] as Vec3,
+  chamberCenter: [0, 0, -38] as Vec3,
+  chamberHalf: { w: 13, d: 9 },
   pedestals: [
-    [-5.5, 0, -30],
-    [0, 0, -33],
-    [5.5, 0, -30],
+    [-6, 0, -38],
+    [0, 0, -42],
+    [6, 0, -38],
   ] as Vec3[],
-  innerDoor: [0, 0, -38] as Vec3,
-  heartRoom: [0, 0, -50] as Vec3,
-  heartRoomRadius: 10,
-  heart: [0, 2.6, -52] as Vec3,
+  innerDoor: [0, 0, -47] as Vec3,
+  heartRoom: [0, 0, -61] as Vec3,
+  heartRoomRadius: 12,
+  heart: [0, 2.6, -63] as Vec3,
 };
 
 export const FINAL = {

@@ -8,28 +8,7 @@ import { getWorld } from "@/game/engine/world";
 import type { SceneId } from "@/types/game";
 
 // jsdom never loads images, so hand every texture hook an inert texture.
-vi.mock("@react-three/drei", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@react-three/drei")>();
-  const { Texture } = await import("three");
-  const cache = new Map<string, InstanceType<typeof Texture>>();
-  const fake = (url: string) => {
-    let t = cache.get(url);
-    if (!t) {
-      t = new Texture();
-      cache.set(url, t);
-    }
-    return t;
-  };
-  const useTexture = Object.assign(
-    (input: string | string[] | Record<string, string>) => {
-      if (typeof input === "string") return fake(input);
-      if (Array.isArray(input)) return input.map(fake);
-      return Object.fromEntries(Object.entries(input).map(([k, v]) => [k, fake(v)]));
-    },
-    { preload: () => undefined, clear: () => undefined },
-  );
-  return { ...actual, useTexture };
-});
+vi.mock("@react-three/drei", () => import("../helpers/drei").then((m) => m.mockDrei()));
 
 // --- browser shims the engine expects --------------------------------------
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

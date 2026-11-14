@@ -4,6 +4,7 @@ import type {
   SceneDefinition,
   SceneId,
 } from "@/types/game";
+import { CASTLE, FINAL, GARDEN, SKY_ISLAND } from "./landmarks";
 
 /* -------------------------------------------------------------------------- */
 /*  Chapters                                                                  */
@@ -79,7 +80,7 @@ const defs: SceneDefinition[] = [
     kind: "explore",
     environment: "sky-island",
     objective: { id: "explore-island", text: "Jelajahi pulau — walk to the glowing marker", total: 1 },
-    spawn: { position: [0, 0, 4], yaw: Math.PI },
+    spawn: { position: SKY_ISLAND.spawn, yaw: Math.PI },
     checkpoint: true,
     next: "first-message",
   },
@@ -126,7 +127,7 @@ const defs: SceneDefinition[] = [
     kind: "explore",
     environment: "memory-garden",
     objective: { id: "reach-pavilion", text: "Jalan ke paviliun di tengah taman", total: 1 },
-    spawn: { position: [0, 0, 22], yaw: Math.PI },
+    spawn: { position: GARDEN.spawn, yaw: Math.PI },
     checkpoint: true,
     next: "little-things",
   },
@@ -242,7 +243,7 @@ const defs: SceneDefinition[] = [
     kind: "explore",
     environment: "castle",
     objective: { id: "reach-gate", text: "Cari pintu masuk kastil", total: 1 },
-    spawn: { position: [0, 0, 26], yaw: Math.PI },
+    spawn: { position: CASTLE.spawn, yaw: Math.PI },
     checkpoint: true,
     next: "three-keys",
   },
@@ -300,7 +301,7 @@ const defs: SceneDefinition[] = [
     kind: "explore",
     environment: "final-garden",
     objective: { id: "follow-path", text: "Ikuti jalan yang bercahaya", total: 3 },
-    spawn: { position: [0, 0, 30], yaw: Math.PI },
+    spawn: { position: FINAL.spawn, yaw: Math.PI },
     checkpoint: true,
     next: "everything-we-found",
   },
