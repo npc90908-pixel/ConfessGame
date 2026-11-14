@@ -1,0 +1,356 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   A JOURNEY TO YOUR HEART — design system tokens
+   Midnight purple · lavender · rose pink · soft gold
+--------------------------------------------------------------------------- */
+@theme {
+  --color-midnight-950: #06040f;
+  --color-midnight-900: #0b0718;
+  --color-midnight-800: #140d2b;
+  --color-midnight-700: #1c1240;
+  --color-midnight-600: #2a1b5e;
+  --color-midnight-500: #3b2a7a;
+
+  --color-lavender-100: #efe9ff;
+  --color-lavender-200: #d7ccff;
+  --color-lavender-300: #b9a7ff;
+  --color-lavender-400: #9d8df1;
+  --color-lavender-500: #7f6ad8;
+
+  --color-rose-100: #ffe3ee;
+  --color-rose-200: #f9c6d9;
+  --color-rose-300: #ff9fc4;
+  --color-rose-400: #ff8fb8;
+  --color-rose-500: #ff6fa3;
+  --color-rose-600: #e9548c;
+
+  --color-gold-100: #fff6dd;
+  --color-gold-200: #fff1c9;
+  --color-gold-300: #f8dfa3;
+  --color-gold-400: #f3d08a;
+  --color-gold-500: #e8b86d;
+
+  --color-ink: #f6f1ff;
+  --color-ink-muted: #b8aed6;
+  --color-ink-faint: #7f74a3;
+
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  --font-script: var(--font-dancing), "Dancing Script", cursive;
+
+  --shadow-glow-rose: 0 0 40px -6px rgb(255 111 163 / 0.55);
+  --shadow-glow-gold: 0 0 40px -6px rgb(243 208 138 / 0.55);
+  --shadow-glow-lavender: 0 0 48px -8px rgb(185 167 255 / 0.5);
+  --shadow-glass: 0 20px 60px -20px rgb(6 4 15 / 0.8), inset 0 1px 0 0 rgb(255 255 255 / 0.08);
+
+  --ease-cinematic: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 2.4s ease-in-out infinite;
+  --animate-shimmer: shimmer 3s linear infinite;
+  --animate-twinkle: twinkle 2.8s ease-in-out infinite;
+  --animate-heartbeat: heartbeat 1.6s ease-in-out infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      opacity: 0.55;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.06);
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes twinkle {
+    0%,
+    100% {
+      opacity: 0.2;
+      transform: scale(0.8);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+  }
+  @keyframes heartbeat {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    14% {
+      transform: scale(1.12);
+    }
+    28% {
+      transform: scale(1);
+    }
+    42% {
+      transform: scale(1.09);
+    }
+    70% {
+      transform: scale(1);
+    }
+  }
+}
+
+:root {
+  color-scheme: dark;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+html,
+body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  background: var(--color-midnight-950);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Game canvas should never show a focus outline or allow text selection. */
+canvas {
+  display: block;
+  outline: none;
+  touch-action: none;
+}
+
+/* Text that *should* be selectable (letters, memories) */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+::selection {
+  background: rgb(255 111 163 / 0.35);
+  color: var(--color-ink);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Utilities                                                                 */
+/* ------------------------------------------------------------------------ */
+@utility glass {
+  background: linear-gradient(
+    160deg,
+    rgb(28 18 64 / 0.72) 0%,
+    rgb(11 7 24 / 0.78) 100%
+  );
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgb(185 167 255 / 0.18);
+  box-shadow: var(--shadow-glass);
+}
+
+@utility glass-light {
+  background: linear-gradient(
+    160deg,
+    rgb(185 167 255 / 0.12) 0%,
+    rgb(255 143 184 / 0.06) 100%
+  );
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgb(255 255 255 / 0.12);
+}
+
+@utility text-gradient-rose {
+  background: linear-gradient(
+    120deg,
+    var(--color-gold-200) 0%,
+    var(--color-rose-300) 45%,
+    var(--color-lavender-200) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility text-shimmer {
+  background: linear-gradient(
+    110deg,
+    var(--color-gold-200) 20%,
+    #ffffff 40%,
+    var(--color-rose-200) 60%,
+    var(--color-gold-200) 80%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: var(--animate-shimmer);
+}
+
+@utility scrollbar-elegant {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(185 167 255 / 0.35) transparent;
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgb(185 167 255 / 0.35);
+    border-radius: 999px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@utility pointer-events-none-children {
+  & > * {
+    pointer-events: none;
+  }
+}
+
+@utility paper {
+  background-color: #fbf4ea;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgb(255 255 255 / 0.9), transparent 55%),
+    radial-gradient(circle at 80% 90%, rgb(232 184 109 / 0.18), transparent 50%),
+    url("/textures/paper.webp");
+  background-size: auto, auto, 512px 512px;
+  color: #3a2a3f;
+  box-shadow:
+    0 30px 80px -30px rgb(0 0 0 / 0.8),
+    inset 0 0 60px rgb(232 184 109 / 0.15);
+}
+
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--color-rose-300);
+    outline-offset: 3px;
+  }
+}
+
+/* Typewriter caret */
+.caret::after {
+  content: "▍";
+  margin-left: 1px;
+  color: var(--color-rose-300);
+  animation: caret-blink 0.9s steps(1) infinite;
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: neutralise decorative CSS animations. */
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe-only {
+    animation: none !important;
+  }
+}
+html[data-reduced-motion="true"] .motion-safe-only {
+  animation: none !important;
+}
+
+/* Keyboard key cap */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.45rem;
+  border-radius: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-ink);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.04));
+  border: 1px solid rgb(255 255 255 / 0.18);
+  box-shadow:
+    0 2px 0 rgb(0 0 0 / 0.4),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+
+/* Range input styling (settings sliders) */
+input[type="range"].slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--color-rose-400) 0%,
+    var(--color-rose-400) var(--value, 50%),
+    rgb(255 255 255 / 0.12) var(--value, 50%),
+    rgb(255 255 255 / 0.12) 100%
+  );
+  outline: none;
+}
+input[type="range"].slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--color-rose-400);
+  box-shadow: 0 0 12px rgb(255 111 163 / 0.6);
+  cursor: pointer;
+}
+input[type="range"].slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--color-rose-400);
+  box-shadow: 0 0 12px rgb(255 111 163 / 0.6);
+  cursor: pointer;
+}
+input[type="range"].slider:focus-visible {
+  outline: 2px solid var(--color-rose-300);
+  outline-offset: 4px;
+}
+
+/* One-shot glow used by the quest tracker when an objective advances. */
+@keyframes objective-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(243, 208, 138, 0.9), 0 0 24px rgba(243, 208, 138, 0.6);
+    opacity: 1;
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(243, 208, 138, 0), 0 0 0 rgba(243, 208, 138, 0);
+    opacity: 0;
+  }
+}
+.objective-flash {
+  animation: objective-flash 1.2s ease-out forwards;
+}
+html[data-reduced-motion="true"] .objective-flash {
+  animation-duration: 0.3s;
+}
