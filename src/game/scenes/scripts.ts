@@ -322,6 +322,8 @@ const scripts: Record<SceneId, Script> = {
       audio.playMusic("gentle", 1500);
       gsap.to(fx, { questionMood: 0.6, duration: 2 });
     }
+    // Reaching the ending completes the journey (100 % on the title screen).
+    useProgressStore.getState().completeScene("new-beginning");
     useUIStore.getState().openOverlay({ type: "ending", answer });
   },
 };

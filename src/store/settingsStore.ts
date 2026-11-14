@@ -105,6 +105,6 @@ export const useSettingsStore = create<SettingsState>()(
 export function prefersReducedMotion(motion: MotionSetting): boolean {
   if (motion === "reduced") return true;
   if (motion === "full") return false;
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }

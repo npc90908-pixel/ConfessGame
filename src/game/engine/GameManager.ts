@@ -84,6 +84,8 @@ export class GameManager {
     ui.setPhase("playing");
     ui.setHudHidden(true);
     await this.openOverlayAndWait({ type: "intro" });
+    // The intro sequence *is* scene 01.
+    useProgressStore.getState().completeScene("awakening");
     await this.enterScene("strange-place");
   }
 
@@ -429,23 +431,33 @@ export class GameManager {
         );
       },
     };
-    build(tl, ctx);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      this.cinematic = null;
+      tl.kill();
+      useUIStore.getState().setSubtitle(null);
+      useUIStore.getState().setCinematic(false);
+      rig.mode = opts.keepCameraMode ? previousMode : previousMode === "cinematic" ? "follow" : previousMode;
+      if (rig.mode === "cinematic") rig.mode = "follow";
+    };
+
+    try {
+      build(tl, ctx);
+    } catch (error) {
+      // A broken script must never leave the player locked in a cinematic.
+      finish();
+      return Promise.reject(error);
+    }
 
     return new Promise<void>((resolve) => {
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        this.cinematic = null;
-        tl.kill();
-        useUIStore.getState().setSubtitle(null);
-        useUIStore.getState().setCinematic(false);
-        rig.mode = opts.keepCameraMode ? previousMode : previousMode === "cinematic" ? "follow" : previousMode;
-        if (rig.mode === "cinematic") rig.mode = "follow";
+      const complete = () => {
+        finish();
         resolve();
       };
-      tl.eventCallback("onComplete", finish);
-      this.cinematic = { tl, finish };
+      tl.eventCallback("onComplete", complete);
+      this.cinematic = { tl, finish: complete };
       tl.play();
     });
   }
@@ -492,7 +504,9 @@ export class GameManager {
   /* ------------------------------------------------------------------ */
 
   async answer(answer: Answer) {
-    useProgressStore.getState().setAnswer(answer);
+    const progress = useProgressStore.getState();
+    progress.setAnswer(answer);
+    progress.completeScene("the-question");
     useUIStore.getState().closeOverlay();
     await this.enterScene("new-beginning");
   }
