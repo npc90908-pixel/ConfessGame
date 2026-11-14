@@ -125,9 +125,24 @@ Set `NEXT_PUBLIC_SITE_URL` to your production URL so social cards resolve correc
 | `npm run build` / `npm start` | production build / serve |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint (Next + TypeScript rules) |
-| `npm test` | Vitest |
+| `npm test` | Vitest (see below) |
 | `npm run check` | all of the above plus a build |
 | `npm run assets:audio` / `assets:textures` | regenerate the procedural assets |
+
+## Tests
+
+`npm test` runs everything headlessly in about a minute — no browser needed:
+
+| Suite | What it proves |
+| --- | --- |
+| `tests/*.test.ts` | story content is complete, scene registry is consistent, every asset in the manifest exists, inventory/progress rules |
+| `tests/shaders.test.ts` | every custom GLSL program compiles with the Khronos reference compiler, assembled exactly as three.js feeds it to WebGL 2 |
+| `tests/smoke/environments.test.tsx` | all five 3D worlds mount with the React Three Fiber test renderer and report ready |
+| `tests/smoke/walkthrough.test.ts` | a headless `GameManager` plays title → ending (100 % completion), restarts a chapter, answers "not yet", resumes a checkpoint |
+| `tests/smoke/gameplay.test.tsx` | each chapter is played *inside its real environment*: teleport to landmarks, trigger the actual interactables, collect, solve, finish |
+| `tests/ui/overlays.test.tsx` | the HTML layer in jsdom: title screen, every overlay, letters, proposal buttons, dialogue stepping, HUD objective, toasts, pause/resume |
+
+Run a single suite with `npx vitest run tests/smoke/gameplay.test.tsx`.
 
 ## Licence
 

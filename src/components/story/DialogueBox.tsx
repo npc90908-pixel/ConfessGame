@@ -54,7 +54,17 @@ function LineView({ line, index, total, onAdvance, onSkipAll }: LineViewProps) {
   }, [next, onSkipAll]);
 
   return (
-    <button type="button" onClick={next} className="glass relative w-full max-w-3xl cursor-pointer rounded-3xl px-5 py-5 text-left focus-ring md:px-8 md:py-6" aria-live="polite">
+    // Not a <button>: the "skip" control inside must stay a real button, and
+    // buttons cannot nest. Keyboard advancing is handled by the window listener above.
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={next}
+      onKeyDown={(e) => {
+        // Space/Enter are already handled globally; stop the default scroll/click double-fire.
+        if (e.key === " " || e.key === "Enter") e.preventDefault();
+      }}
+      className="glass relative w-full max-w-3xl cursor-pointer rounded-3xl px-5 py-5 text-left focus-ring md:px-8 md:py-6" aria-live="polite">
       {line.speaker && (
         <span
           className={
@@ -98,7 +108,7 @@ function LineView({ line, index, total, onAdvance, onSkipAll }: LineViewProps) {
           </span>
         </span>
       </div>
-    </button>
+    </div>
   );
 }
 
