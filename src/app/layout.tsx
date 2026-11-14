@@ -35,6 +35,7 @@ const dancing = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://a-journey-to-your-heart.vercel.app"),
   title: story.title,
   description: story.tagline,
   applicationName: story.title,
@@ -42,13 +43,13 @@ export const metadata: Metadata = {
     title: story.title,
     description: story.tagline,
     type: "website",
-    images: [{ url: "/images/og-image.jpg", width: 1200, height: 630 }],
+    images: [{ url: "/images/og.jpg", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
     title: story.title,
     description: story.tagline,
-    images: ["/images/og-image.jpg"],
+    images: ["/images/og.jpg"],
   },
   robots: { index: false, follow: false },
 };

@@ -92,7 +92,7 @@ export const TEXTURES = {
 } as const;
 
 export const IMAGES = {
-  ogImage: "/images/og-image.jpg",
+  ogImage: "/images/og.jpg",
   keyVisual: "/images/key-visual.webp",
 } as const;
 
