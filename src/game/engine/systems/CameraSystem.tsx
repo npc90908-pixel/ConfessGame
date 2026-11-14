@@ -84,8 +84,8 @@ export function CameraSystem() {
     } else {
       // title
       const t = runtime.clock;
-      desiredPos.set(Math.sin(t * 0.07) * 1.5, 2.2 + Math.sin(t * 0.11) * 0.6, 14);
-      desiredTarget.set(0, 3 + Math.sin(t * 0.05) * 0.5, 0);
+      desiredPos.set(Math.sin(t * 0.05) * 7, 6.5 + Math.sin(t * 0.09) * 0.8, 29 + Math.cos(t * 0.05) * 2);
+      desiredTarget.set(0, 2.2 + Math.sin(t * 0.04) * 0.4, -4);
       rig.position.lerp(desiredPos, damp(1.5, dt));
       rig.target.lerp(desiredTarget, damp(1.5, dt));
       rig.fov = lerp(rig.fov, 55, damp(2, dt));

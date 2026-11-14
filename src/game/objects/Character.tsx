@@ -38,7 +38,7 @@ const COLORS = {
  * procedural animation rig (idle / walk / run / jump / sit). No external
  * model files are required, so it loads instantly and never breaks.
  */
-export function Character({ driven = true, sitting = false, scale = 1, lantern = true, castShadow = true }: CharacterProps) {
+export function Character({ driven = true, sitting: sittingProp = false, scale = 1, lantern = true, castShadow = true }: CharacterProps) {
   const root = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
@@ -84,6 +84,8 @@ export function Character({ driven = true, sitting = false, scale = 1, lantern =
     const t = clock.elapsedTime;
     const p = runtime.player;
     const s = state.current;
+    // Sitting is forced while the player drives the boat.
+    const sitting = sittingProp || (driven && p.mode === "boat");
 
     if (root.current && driven) {
       root.current.position.copy(p.position);
