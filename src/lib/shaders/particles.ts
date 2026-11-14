@@ -25,15 +25,15 @@ export const particleVertex = /* glsl */ `
     p.x += sin(t * 1.3 + aSeed * 6.28) * uSway;
     p.z += cos(t * 0.9 + aSeed * 3.14) * uSway;
     // Wrap inside the bounding box around the centre
-    vec3 half = uBounds * 0.5;
-    vec3 rel = p - uCenter + half;
+    vec3 halfBounds = uBounds * 0.5;
+    vec3 rel = p - uCenter + halfBounds;
     rel = mod(rel, uBounds);
-    p = rel - half + uCenter;
+    p = rel - halfBounds + uCenter;
 
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     float twinkle = mix(1.0, 0.45 + 0.55 * (0.5 + 0.5 * sin(uTime * (2.0 + aSeed * 3.0) + aSeed * 40.0)), uTwinkle);
     // Fade near the wrap edges so particles don't pop
-    vec3 edge = abs(rel - half) / half;
+    vec3 edge = abs(rel - halfBounds) / halfBounds;
     float edgeFade = 1.0 - smoothstep(0.75, 1.0, max(edge.x, max(edge.y, edge.z)));
     vAlpha = twinkle * edgeFade;
     gl_PointSize = aSize * uScale * uPixelRatio * (260.0 / max(-mv.z, 0.5));
