@@ -242,6 +242,8 @@ export const useProgressStore = create<ProgressState>()(
         stats: s.stats,
       }),
       merge: (persisted, current) => {
+        // First visit: nothing stored yet.
+        if (persisted === undefined || persisted === null) return current;
         const parsed = saveSchema.safeParse(persisted);
         if (!parsed.success) {
           console.warn("[save] Stored progress was invalid and has been ignored.", parsed.error.issues);
