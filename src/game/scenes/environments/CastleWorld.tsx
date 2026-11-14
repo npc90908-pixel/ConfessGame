@@ -513,7 +513,7 @@ export default function CastleWorld() {
       ))}
 
       <GlowMarker position={[CASTLE.gate[0], getHeight(CASTLE.gate[0], CASTLE.gate[2]), CASTLE.gate[2]]} active={sceneId === "forgotten-castle"} color="#f3d08a" />
-      <GlowMarker position={[CASTLE.gate[0], 0.15, CASTLE.gate[2] - 4]} active={sceneId === "unspoken-words" && fx.castleGate > 0.5 && runtime.player.position.z > FZ} color="#f3d08a" beam={false} />
+      <GlowMarker position={[CASTLE.gate[0], 0.15, CASTLE.gate[2] - 4]} active={sceneId === "unspoken-words"} color="#f3d08a" beam={false} />
       <GlowMarker position={[CASTLE.heartRoom[0], 0.2, CASTLE.heartRoom[2] + 6]} active={sceneId === "heart-chamber"} color="#ff8fb8" />
 
       {showKeys &&

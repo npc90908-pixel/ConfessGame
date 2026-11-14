@@ -351,6 +351,22 @@ def heart_poly(d: ImageDraw.ImageDraw, cx, cy, s, fill):
     d.polygon(pts, fill=fill)
 
 
+FONT_DIRS = ["/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/truetype", "/Library/Fonts", "C:/Windows/Fonts"]
+
+
+def load_font(candidates, size):
+    """Best-effort system font lookup (Pillow cannot read woff2)."""
+    for name in candidates:
+        for d in FONT_DIRS:
+            path = os.path.join(d, name)
+            if os.path.exists(path):
+                try:
+                    return ImageFont.truetype(path, size)
+                except Exception:
+                    continue
+    return ImageFont.load_default()
+
+
 def og_card(size=(1200, 630)):
     w, h = size
     arr = gradient(size, "#120b2e", "#3a1f5a", 0.9)
@@ -363,20 +379,14 @@ def og_card(size=(1200, 630)):
         y0 = rng.uniform(0, h)
         r = rng.uniform(0.8, 3)
         d.ellipse([x0 - r, y0 - r, x0 + r, y0 + r], fill=(255, 255, 255, int(rng.uniform(60, 220))))
-    heart_poly(d, w * 0.78, h * 0.5, 150, (255, 111, 163, 230))
-    heart_poly(d, w * 0.78, h * 0.5, 100, (255, 214, 231, 240))
+    heart_poly(d, w * 0.86, h * 0.5, 120, (255, 111, 163, 230))
+    heart_poly(d, w * 0.86, h * 0.5, 80, (255, 214, 231, 240))
     img = Image.alpha_composite(img, layer.filter(ImageFilter.GaussianBlur(0.6)))
     d = ImageDraw.Draw(img)
-    try:
-        font_big = ImageFont.truetype(os.path.join(ROOT, "fonts", "cormorant-garamond-600.woff2"), 84)
-    except Exception:
-        font_big = ImageFont.load_default()
-    try:
-        font_small = ImageFont.truetype(os.path.join(ROOT, "fonts", "inter-400.woff2"), 30)
-    except Exception:
-        font_small = ImageFont.load_default()
-    d.text((80, 200), "A Journey to Your Heart", font=font_big, fill=(255, 240, 248))
-    d.text((84, 310), "Sebuah petualangan kecil, dari aku untukmu.", font=font_small, fill=(220, 200, 235))
+    font_big = load_font(["DejaVuSerif.ttf", "Georgia.ttf", "Times New Roman.ttf"], 72)
+    font_small = load_font(["DejaVuSans.ttf", "Arial.ttf"], 30)
+    d.text((80, 230), "A Journey to Your Heart", font=font_big, fill=(255, 240, 248))
+    d.text((84, 330), "Sebuah petualangan kecil, dari aku untukmu.", font=font_small, fill=(220, 200, 235))
     return img.convert("RGB")
 
 

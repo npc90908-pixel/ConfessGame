@@ -198,8 +198,8 @@ function Boat() {
         <capsuleGeometry args={[0.9, 2.6, 6, 12]} />
         <meshStandardMaterial color="#2a1a14" roughness={0.9} />
       </mesh>
-      <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1.0, 0.09, 8, 28]} scale={[1, 2.2, 1]} />
+      <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 2.2, 1]}>
+        <torusGeometry args={[1.0, 0.09, 8, 28]} />
         <meshStandardMaterial color="#8a5a3a" roughness={0.8} />
       </mesh>
       {/* bench + lantern pole at the bow */}
@@ -306,8 +306,8 @@ function StarShrine({ active, onInteract }: { active: boolean; onInteract: () =>
   });
   return (
     <group position={[p[0], 0, p[2]]}>
-      <mesh position={[0, -0.5, 0]}>
-        <dodecahedronGeometry args={[SHRINE_ROCK_R, 1]} scale={[1, 0.35, 1]} />
+      <mesh position={[0, -0.5, 0]} scale={[1, 0.35, 1]}>
+        <dodecahedronGeometry args={[SHRINE_ROCK_R, 1]} />
         <meshStandardMaterial color="#3a3350" roughness={1} flatShading />
       </mesh>
       <mesh position={[0, 1.2, 0]}>

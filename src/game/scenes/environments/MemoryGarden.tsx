@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
@@ -88,6 +88,8 @@ function Pavilion() {
 /* -------------------------------------------------------------------------- */
 /*  Floating polaroids                                                        */
 /* -------------------------------------------------------------------------- */
+
+story.memories.forEach((m) => useTexture.preload(m.image));
 
 function Polaroid({ index, active }: { index: number; active: boolean }) {
   const memory = story.memories[index];
@@ -445,7 +447,14 @@ export default function MemoryGarden() {
           />
         ))}
 
-      {showPolaroids && story.memories.map((_, i) => <Polaroid key={i} index={i} active={sceneId === "memory-in-the-air" || sceneId === "memory-tree"} />)}
+      {/* Polaroids suspend on their textures — keep that local so the world never unmounts. */}
+      {showPolaroids && (
+        <Suspense fallback={null}>
+          {story.memories.map((_, i) => (
+            <Polaroid key={i} index={i} active={sceneId === "memory-in-the-air" || sceneId === "memory-tree"} />
+          ))}
+        </Suspense>
+      )}
 
       <Particles count={220} texture="petal" color={["#ff9fc4", "#ffd6e7", "#f3d08a"]} size={[0.1, 0.26]} area={[56, 12, 56]} center={[0, 6, 0]} velocity={[0.6, -0.35, 0.2]} jitter={0.5} sway={1} spin={1.5} twinkle={0.2} additive={false} seed={61} />
       <Particles count={140} texture="firefly" color={["#ffd27a", "#fff1c9"]} size={[0.06, 0.18]} area={[50, 5, 50]} center={[0, 1.5, 0]} velocity={[0.05, 0.08, 0.05]} jitter={0.5} sway={0.6} twinkle={1.8} seed={62} />

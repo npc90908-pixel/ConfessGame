@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CHAPTERS, SCENES, SCENE_ORDER, TOTAL_SCENES, getChapterOfScene, getScene, isFirstSceneOfChapter, isLastSceneOfChapter, nextChapter } from "@/game/scenes/registry";
 import { story } from "@/config/story";
+import type { SceneId } from "@/types/game";
 
 describe("scene registry", () => {
   it("has 25 scenes in 5 chapters of 5", () => {
@@ -11,11 +12,11 @@ describe("scene registry", () => {
 
   it("forms a single linear chain from the first scene to the ending", () => {
     const visited = new Set<string>();
-    let id: string | undefined = SCENE_ORDER[0];
+    let id: SceneId | null = SCENE_ORDER[0];
     while (id) {
       expect(visited.has(id), `cycle at ${id}`).toBe(false);
       visited.add(id);
-      id = getScene(id as never).next;
+      id = getScene(id).next ?? null;
     }
     expect(visited.size).toBe(TOTAL_SCENES);
     expect([...visited].at(-1)).toBe("new-beginning");
