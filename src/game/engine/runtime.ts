@@ -20,6 +20,9 @@ export interface PlayerRuntime {
   moving: boolean;
   running: boolean;
   jumpTime: number;
+  /** Downward speed at the last touchdown (m/s) and when it happened — drives squash/dust. */
+  landImpact: number;
+  landTime: number;
   mode: ControlMode;
   /** Visible character scale multiplier (used for portal shrink etc.). */
   scale: number;
@@ -88,6 +91,8 @@ export const runtime: Runtime = {
     moving: false,
     running: false,
     jumpTime: -10,
+    landImpact: 0,
+    landTime: -10,
     mode: "walk",
     scale: 1,
     visible: true,

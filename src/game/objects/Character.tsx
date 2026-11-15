@@ -10,6 +10,7 @@ import { PARTICLES } from "@/config/assets";
 import { CHARACTER_MODELS, MODELS, type CharacterModelId } from "@/config/models";
 import { runtime } from "@/game/engine/runtime";
 import { useQuality } from "@/game/systems/quality";
+import { getAnimationIntensity } from "@/store/settingsStore";
 import { damp, lerp } from "@/lib/math";
 import { Model, useModel } from "./Model";
 
@@ -79,7 +80,9 @@ export function Character({ driven = true, sitting: sittingProp = false, scale =
 
   const shadowMat = useMemo(() => new THREE.MeshBasicMaterial({ map: glow, color: "#000000", transparent: true, opacity: 0.38, depthWrite: false }), [glow]);
 
-  const state = useRef<{ pose: Pose | null; walk: number; air: number }>({ pose: null, walk: 0, air: 0 });
+  const state = useRef<{ pose: Pose | null; walk: number; air: number; lean: number; tilt: number; squash: number; squashVel: number; landSeen: number }>({ pose: null, walk: 0, air: 0, lean: 0, tilt: 0, squash: 0, squashVel: 0, landSeen: -10 });
+  const body = useRef<THREE.Group>(null);
+  const prevVel = useMemo(() => new THREE.Vector3(), []);
 
   useEffect(() => {
     const idle = actions.idle;
@@ -112,6 +115,41 @@ export function Character({ driven = true, sitting: sittingProp = false, scale =
     const targetWalk = sitting ? 0 : Math.min(1, speed / CONTROLS.player.walkSpeed);
     s.walk = lerp(s.walk, targetWalk, damp(10, dt));
     s.air = lerp(s.air, sitting || grounded ? 0 : 1, damp(12, dt));
+
+    // Secondary motion (scaled by the animation-intensity setting):
+    // lean into acceleration, pitch forward with speed, squash on landing / stretch in the air.
+    const intensity = getAnimationIntensity();
+    if (driven && !sitting) {
+      const ax = (p.velocity.x - prevVel.x) / Math.max(dt, 1e-3);
+      const az = (p.velocity.z - prevVel.z) / Math.max(dt, 1e-3);
+      prevVel.set(p.velocity.x, 0, p.velocity.z);
+      // Express acceleration in the character's local frame (facing = (sin yaw, cos yaw)).
+      const fwd = ax * Math.sin(p.yaw) + az * Math.cos(p.yaw);
+      const side = ax * Math.cos(p.yaw) - az * Math.sin(p.yaw);
+      const targetLean = THREE.MathUtils.clamp(fwd * 0.012 + (speed / CONTROLS.player.walkSpeed) * 0.05, -0.18, 0.22) * intensity;
+      const targetTilt = THREE.MathUtils.clamp(-side * 0.012, -0.16, 0.16) * intensity;
+      s.lean = lerp(s.lean, grounded ? targetLean : 0, damp(8, dt));
+      s.tilt = lerp(s.tilt, grounded ? targetTilt : 0, damp(8, dt));
+      if (p.landTime > s.landSeen) {
+        s.landSeen = p.landTime;
+        s.squashVel -= Math.min(2.2, p.landImpact * 0.35) * intensity;
+      }
+    } else {
+      prevVel.set(0, 0, 0);
+      s.lean = lerp(s.lean, 0, damp(8, dt));
+      s.tilt = lerp(s.tilt, 0, damp(8, dt));
+    }
+    // Spring back to rest; a little stretch while airborne.
+    const rest = !grounded && !sitting ? 0.08 * intensity : 0;
+    s.squashVel += (rest - s.squash) * 180 * dt;
+    s.squashVel *= Math.max(0, 1 - 14 * dt);
+    s.squash = THREE.MathUtils.clamp(s.squash + s.squashVel * dt, -0.35, 0.25);
+    if (body.current) {
+      body.current.rotation.set(s.lean, 0, s.tilt);
+      const sy = 1 + s.squash;
+      const sxz = 1 - s.squash * 0.5;
+      body.current.scale.set(CHARACTER_SCALE * sxz, CHARACTER_SCALE * sy, CHARACTER_SCALE * sxz);
+    }
 
     let pose: Pose;
     if (sitting) pose = "sit";
@@ -162,7 +200,7 @@ export function Character({ driven = true, sitting: sittingProp = false, scale =
       <mesh rotation-x={-Math.PI / 2} position-y={0.03} material={shadowMat} renderOrder={-1}>
         <planeGeometry args={[1.3, 1.3]} />
       </mesh>
-      <group scale={CHARACTER_SCALE}>
+      <group ref={body} scale={CHARACTER_SCALE}>
         <primitive object={scene} />
       </group>
       {/* Lantern hooked to the right arm bone so it swings with the animation (model units: parent scales 1.85×). */}

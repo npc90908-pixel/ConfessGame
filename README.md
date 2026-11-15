@@ -84,6 +84,16 @@ python3 scripts/preview/sheet.py sheet.png public/models/kenney/nature/*.glb --c
 npx tsx scripts/tools/measure-glb.mts public/models/kenney/pirate/ship-small.glb        # bounding boxes, materials, clips
 ```
 
+Any *mounted* environment can be exported the same way — it runs the real React component headlessly, dumps every mesh and model instance, and probes the walk height against the drawn geometry (gaps, buried props, floating models):
+
+```bash
+EXPORT_ENV=memory-garden EXPORT_PROBE_EXTENT=44 EXPORT_PROBE_STEP=2 npx vitest run tests/tools/export-scene.test.tsx
+python3 scripts/preview/render.py /tmp/scene-memory-garden.json garden.png --cam 0,70,70 --target 0,0,0 --fov 60
+npx tsx scripts/tools/probe-garden.mts     # heights / slopes / bridge profiles of the garden height field
+```
+
+The Garden of Memories follows the same pattern as the castle: `environments/garden/terrain.ts` is **one continuous height field** (rolling lawn + pavilion plateau + tree mound + hills, with the stream carved out and the bridge decks blended in), so the walk height, collision, camera clamp and the drawn ground can never disagree.
+
 ## Controls
 
 | Action | Desktop | Mobile |
@@ -112,10 +122,10 @@ src/
 │  ├─ engine/              GameManager (scene flow), runtime, input, world, fx, interactions
 │  ├─ engine/systems/      Player, camera, interaction and look-control systems (useFrame)
 │  ├─ scenes/              registry (25 scenes), landmarks, scripts, SceneRouter
-│  ├─ scenes/environments/ SkyIsland · MemoryGarden · OceanWorld · CastleWorld (+ castle/layout.ts, terrain.ts) · FinalGarden
-│  ├─ objects/             Model (glTF loader/instancing), terrain, flora, water, portal, collectibles, sky dome, particles, character
+│  ├─ scenes/environments/ SkyIsland · MemoryGarden (+ garden/terrain.ts) · OceanWorld · CastleWorld (+ castle/layout.ts, terrain.ts) · FinalGarden
+│  ├─ objects/             Model (glTF loader/instancing), terrain, flora, water + stream, structures (bridges, hedges), portal, collectibles, keepsakes, sky dome, particles, character
 │  ├─ animations/          GSAP camera helpers
-│  └─ systems/             Audio manager (Howler), quality tiers, inventory items
+│  └─ systems/             Audio manager (Howler), quality tiers, wind field, inventory items
 ├─ lib/                    math, shaders, device detection, preload, i18n
 ├─ store/                  Zustand stores: progress (persisted), settings, UI
 └─ types/
@@ -128,7 +138,8 @@ Design notes:
 - **One persistent `<Canvas>`.** Environments are lazy-loaded React components routed by `SceneRouter`; chapter changes crossfade behind a veil while the next world mounts and reports `notifyEnvironmentReady`.
 - **Hot state lives outside React.** Player, camera rig, input and the interaction registry are plain objects read in `useFrame`; GSAP timelines drive the camera and `fx` values during cinematics. React/Zustand only handle UI and persisted progress.
 - **Scenes are data.** `scenes/registry.ts` declares every scene (chapter, kind, objective, spawn, next); `scenes/scripts.ts` holds the per-scene cinematic/dialogue scripts; environments only expose interactables and proximity triggers.
-- **Boat mode.** The ocean world switches the player into a physics-light boat controller (throttle / steering, wave bobbing from the same `waterHeightAt` function the water shader uses) with a dedicated camera mode.
+- **Boat mode.** The ocean world switches the player into a physics-light boat controller (throttle / steering, wave bobbing from the same `waterHeightAt` function the water shader uses) with a dedicated camera mode. Walking and sailing share one facing convention (`engine/movement.ts`): `facing(yaw) = (sin yaw, cos yaw)`, camera-relative input, `cameraYawBehind(yaw) = yaw + π`.
+- **One wind.** `systems/wind.ts` owns a single set of uniforms; `applyWind(material)` (or the `wind` material override) patches three's standard vertex shader so trees, flowers, bushes and grass sway together, hanging lanterns swing in JS from the same gust function, and the strength follows the *Animation intensity* setting / reduced motion.
 
 ## Deploying
 
@@ -164,6 +175,10 @@ Set `NEXT_PUBLIC_SITE_URL` to your production URL so social cards resolve correc
 | `tests/smoke/walkthrough.test.ts` | a headless `GameManager` plays title → ending (100 % completion), restarts a chapter, answers "not yet", resumes a checkpoint |
 | `tests/smoke/gameplay.test.tsx` | each chapter is played *inside its real environment*: teleport to landmarks, trigger the actual interactables, collect, solve, finish |
 | `tests/smoke/navigation.test.tsx` | the castle chapter is played **on foot** with the real player/camera/interaction systems: held keys, camera-relative steering, proximity prompts only — proves the level is actually walkable (bridge, gatehouse, keys, keep, inner door, heart room) |
+| `tests/smoke/garden.test.tsx` | the Garden of Memories on foot: gate → footbridge (feet on the deck, not in the stream) → pavilion plateau, all five flowers across meadows/hill via the side bridges, the hidden hedge-nook keepsake, the knoll and grove memory spots |
+| `tests/smoke/sailing.test.tsx` | the boat: walk the pier, board via the prompt, W/S/A/D judged against the camera basis, sail to the first marker |
+| `tests/settings.test.ts`, `tests/wind.test.ts` | settings persistence/migration/clamps and the quality presets; the wind field follows the animation-intensity setting and patches materials correctly |
+| `tests/tools/export-scene.test.tsx` | (on demand, `EXPORT_ENV=…`) dumps a mounted world for the software renderer and probes walk height vs drawn geometry |
 | `tests/ui/overlays.test.tsx` | the HTML layer in jsdom: title screen, every overlay, letters, proposal buttons, dialogue stepping, HUD objective, toasts, pause/resume |
 
 Run a single suite with `npx vitest run tests/smoke/gameplay.test.tsx`.

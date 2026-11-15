@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CONTROLS } from "@/config/controls";
 import { audio } from "@/game/systems/audio/AudioManager";
+import { getAnimationIntensity } from "@/store/settingsStore";
 import { selectControlsLocked, useUIStore } from "@/store/uiStore";
 import { clamp, damp, dampAngle, lerp } from "@/lib/math";
 import { consumeAction, getMoveAxis, isActionHeld } from "../input";
@@ -101,6 +102,9 @@ export function PlayerSystem() {
     if (y <= groundY + 0.001 && p.velocity.y <= 0) {
       if (!p.grounded && runtime.clock - p.jumpTime > 0.2) {
         audio.sfx("footstep", { volume: 0.35, rate: 0.9 });
+        p.landImpact = -p.velocity.y;
+        p.landTime = runtime.clock;
+        runtime.camera.shake = Math.max(runtime.camera.shake, Math.min(0.09, p.landImpact * 0.012) * getAnimationIntensity());
       }
       y = groundY;
       p.velocity.y = 0;
