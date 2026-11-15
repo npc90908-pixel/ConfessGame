@@ -45,9 +45,11 @@ export async function mockDrei() {
     if (!g) {
       const scene = new THREE.Group();
       scene.name = url.split("/").pop()?.replace(/\.glb$/, "") ?? "model";
+      scene.userData.url = url; // lets scene exporters swap the stand-in for the real GLB
       const root = new THREE.Group();
       root.name = "root";
       const geometry = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+      geometry.userData.url = url;
       const material = new THREE.MeshStandardMaterial({ name: "colormap", color: "#ffffff" });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = "body-mesh";

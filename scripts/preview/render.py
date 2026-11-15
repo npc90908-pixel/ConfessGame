@@ -18,8 +18,13 @@ Scene JSON:
       "spheres": [{"center": [x,y,z], "radius": 1, "color": "#f0f"}],
       "heightfield": {"minX": -60, "maxX": 60, "minZ": -60, "maxZ": 60, "heights": [[...], ...], "color": "#2f4a3e",
                       "colorFn": optional ignored},
+      "geometries": {"<id>": {"positions": [flat xyz...], "indices": [...] | null}},
+      "meshes": [{"geometry": "<id>", "matrices": [[16 column-major floats], ...], "color": "#888", "double": false}],
       "markers": [{"position": [x,y,z], "label": "gate", "color": "#ff0"}]
     }
+
+The `geometries`/`meshes` form is what `tests/tools/export-scene.test.tsx` writes
+for a mounted environment, so whole maps can be previewed headlessly.
 """
 from __future__ import annotations
 
@@ -85,6 +90,21 @@ class SceneBuilder:
             mat = np.array(m, dtype=np.float64).reshape(4, 4).T  # column-major → row-major
             world = (homo @ mat.T)[:, :3].reshape(-1, 3, 3)
             self.add(world, model.colors, model.double_sided)
+
+    def add_mesh(self, geometry: dict, matrices: list[list[float]], color: str, double: bool) -> None:
+        flat = np.array(geometry["positions"], dtype=np.float64).reshape(-1, 3)
+        if len(flat) == 0:
+            return
+        idx = geometry.get("indices")
+        order = np.array(idx, dtype=np.int64) if idx else np.arange(len(flat))
+        order = order[: len(order) - len(order) % 3]
+        homo = np.concatenate([flat, np.ones((len(flat), 1))], axis=1)
+        base = hex_to_rgb(color)
+        for m in matrices:
+            mat = np.array(m, dtype=np.float64).reshape(4, 4).T
+            world = (homo @ mat.T)[:, :3]
+            tris = world[order].reshape(-1, 3, 3)
+            self.add(tris, np.tile(base, (len(tris), 1)), double)
 
     def add_box(self, center, size, rotation_y, color) -> None:
         w, h, d = [v / 2 for v in size]
@@ -178,6 +198,11 @@ def render(scene: dict, size: tuple[int, int], cam: np.ndarray, target: np.ndarr
         builder.add_sphere(s["center"], s["radius"], s.get("color", "#ff00ff"))
     if "heightfield" in scene:
         builder.add_heightfield(scene["heightfield"])
+    geometries = scene.get("geometries", {})
+    for m in scene.get("meshes", []):
+        geo = geometries.get(m["geometry"])
+        if geo:
+            builder.add_mesh(geo, m["matrices"], m.get("color", "#888888"), bool(m.get("double", False)))
 
     bg = hex_to_rgb(scene.get("background", "#101018"))
     img = Image.new("RGB", (width, height), tuple(int(v * 255) for v in bg))
