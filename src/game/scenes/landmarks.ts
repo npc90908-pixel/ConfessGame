@@ -27,20 +27,34 @@ export const SKY_ISLAND = {
 };
 
 export const GARDEN = {
-  halfSize: 26,
-  spawn: [0, 0, 22] as Vec3,
+  /** Half extent inside the hedges (the garden is 88 m across). */
+  halfSize: 44,
+  /** South gate; the stream and its main bridge lie between here and the pavilion. */
+  spawn: [0, 0, 38] as Vec3,
   pavilion: [0, 0, 0] as Vec3,
+  /** The five flowers are spread over the meadows, the mound and the lawns. */
   flowers: [
-    [-14, 0, 7],
-    [12.5, 0, -9],
-    [-8, 0, -15],
-    [17, 0, 9],
-    [-19, 0, -4],
+    [-26, 0, 6], // west meadow
+    [27, 0, -4], // east meadow
+    [-14, 0, -24], // path to the willow grove
+    [24, 0, 28], // south-east lawn by the hedge nook
+    [-32, 0, 28], // top of the south-west hill
   ] as Vec3[],
   polaroidRadius: 5.2,
   polaroidHeight: 1.85,
-  memoryTree: [0, 0, -19] as Vec3,
-  treeOffer: [0, 0, -14.5] as Vec3,
+  memoryTree: [0, 0, -30] as Vec3,
+  treeOffer: [0, 0, -24.5] as Vec3,
+  /** Optional keepsakes tucked into the hidden corners. */
+  secrets: [
+    [37, 0, 33], // inside the hedge nook
+    [0, 0, -40.5], // behind the Memory Tree
+    [-40, 0, -8], // far west, behind the rocks
+  ] as Vec3[],
+  /** Quiet places that play a line of memory the first time they are found. */
+  memorySpots: {
+    grove: [-28, 0, -28] as Vec3,
+    knoll: [31, 0, -31] as Vec3,
+  },
 };
 
 export const OCEAN = {

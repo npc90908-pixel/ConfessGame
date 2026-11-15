@@ -29,6 +29,22 @@ export function makeRollingHeight(seed: number, amplitude = 0.35, frequency = 0.
   };
 }
 
+/** 1 inside `flatRadius`, easing to 0 at `rampRadius` — a raised plateau / mound profile. */
+export function plateau(distance: number, flatRadius: number, rampRadius: number) {
+  return 1 - smoothstep(flatRadius, rampRadius, distance);
+}
+
+/** Smooth bump that is 1 at the centre and 0 (with zero slope) at `radius`. */
+export function bump(distance: number, radius: number) {
+  const k = 1 - smoothstep(0, radius, distance);
+  return k * k * (3 - 2 * k);
+}
+
+/** 0 inside the channel, 1 beyond the bank — a river/stream cross-section helper. */
+export function channel(distance: number, halfWidth: number, bank: number) {
+  return smoothstep(halfWidth, halfWidth + bank, distance);
+}
+
 /** Build a displaced disc (top surface) following a height function. */
 export function buildDiscSurface(radius: number, segments: number, rings: number, getHeight: (x: number, z: number) => number) {
   const geometry = new THREE.CircleGeometry(radius, segments);
@@ -134,22 +150,41 @@ export interface GroundProps {
   color?: string;
   segments?: number;
   position?: [number, number, number];
+  /**
+   * Optional per-vertex tint (world x/z + height → colour). Lets one continuous
+   * mesh carry stone plazas, stream beds and meadows without stacked planes.
+   */
+  colorAt?: (x: number, z: number, height: number, out: THREE.Color) => void;
 }
 
 /** Large square ground with a rolling height field. */
-export function Ground({ size, getHeight, color = "#2f5e48", segments = 96, position = [0, 0, 0] }: GroundProps) {
+export function Ground({ size, getHeight, color = "#2f5e48", segments = 96, position = [0, 0, 0], colorAt }: GroundProps) {
   const geometry = useMemo(() => {
     const plane = new THREE.PlaneGeometry(size, size, segments, segments);
     plane.rotateX(-Math.PI / 2);
     const pos = plane.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < pos.count; i++) pos.setY(i, getHeight(pos.getX(i), pos.getZ(i)));
+    const colors = colorAt ? new Float32Array(pos.count * 3) : null;
+    const c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const h = getHeight(x, z);
+      pos.setY(i, h);
+      if (colors && colorAt) {
+        colorAt(x, z, h, c);
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+      }
+    }
     pos.needsUpdate = true;
+    if (colors) plane.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     plane.computeVertexNormals();
     return plane;
-  }, [size, segments, getHeight]);
+  }, [size, segments, getHeight, colorAt]);
   return (
     <mesh geometry={geometry} position={position} receiveShadow>
-      <meshStandardMaterial color={color} roughness={0.95} />
+      <meshStandardMaterial color={colorAt ? "#ffffff" : color} roughness={0.95} vertexColors={!!colorAt} />
     </mesh>
   );
 }
@@ -230,4 +265,9 @@ export function GlowingPath({
       <meshStandardMaterial color={color} emissive={color} emissiveIntensity={intensity} roughness={0.6} />
     </instancedMesh>
   );
+}
+
+/** Plain stepping-stone path (same builder as GlowingPath, no glow). */
+export function StonePath({ points, getHeight, spacing = 1.4, color = "#7a7290", radius = 0.5 }: { points: Array<[number, number, number]>; getHeight: (x: number, z: number) => number; spacing?: number; color?: string; radius?: number }) {
+  return <GlowingPath points={points} getHeight={getHeight} spacing={spacing} color={color} intensity={0} radius={radius} />;
 }

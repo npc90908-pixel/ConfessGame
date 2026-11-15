@@ -146,6 +146,8 @@ export interface StoryConfig {
     memoryInTheAir: DialogueLine[];
     memoryTree: DialogueLine[];
     beautifulMoment: DialogueLine[];
+    gardenGrove: DialogueLine[];
+    gardenKnoll: DialogueLine[];
     silentOcean: DialogueLine[];
     sailWithMe: DialogueLine[];
     messageBottles: DialogueLine[];

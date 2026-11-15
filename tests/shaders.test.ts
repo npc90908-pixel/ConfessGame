@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { particleFragment, particleVertex } from "@/lib/shaders/particles";
 import { beamFragment, beamVertex, portalFragment, portalVertex } from "@/lib/shaders/portal";
 import { skyFragment, skyVertex } from "@/lib/shaders/sky";
+import { streamFragment, streamVertex } from "@/lib/shaders/stream";
 import { waterFragment, waterVertex } from "@/lib/shaders/water";
 
 const PROGRAMS = {
@@ -22,6 +23,7 @@ const PROGRAMS = {
   portal: [portalVertex, portalFragment],
   beam: [beamVertex, beamFragment],
   water: [waterVertex, waterFragment],
+  stream: [streamVertex, streamFragment],
 } as const;
 
 const PRECISION = `

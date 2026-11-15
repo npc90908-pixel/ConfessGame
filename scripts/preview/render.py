@@ -100,11 +100,18 @@ class SceneBuilder:
         order = order[: len(order) - len(order) % 3]
         homo = np.concatenate([flat, np.ones((len(flat), 1))], axis=1)
         base = hex_to_rgb(color)
+        vcols = geometry.get("colors")
+        if vcols:
+            vc = np.array(vcols, dtype=np.float64).reshape(-1, 3)
+            # average the three corner colours per triangle, modulated by the material colour
+            tri_cols = vc[order].reshape(-1, 3, 3).mean(axis=1) * np.array(base)
+        else:
+            tri_cols = None
         for m in matrices:
             mat = np.array(m, dtype=np.float64).reshape(4, 4).T
             world = (homo @ mat.T)[:, :3]
             tris = world[order].reshape(-1, 3, 3)
-            self.add(tris, np.tile(base, (len(tris), 1)), double)
+            self.add(tris, tri_cols.copy() if tri_cols is not None else np.tile(base, (len(tris), 1)), double)
 
     def add_box(self, center, size, rotation_y, color) -> None:
         w, h, d = [v / 2 for v in size]

@@ -6,6 +6,7 @@ import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { TEXTURES } from "@/config/assets";
 import { useQuality } from "@/game/systems/quality";
+import { streamFragment, streamVertex } from "@/lib/shaders/stream";
 import { waterFragment, waterVertex } from "@/lib/shaders/water";
 
 export interface WaterProps {
@@ -109,5 +110,92 @@ export function waterHeightAt(x: number, z: number, time: number, waveHeight = 1
     wave(-0.7, 1, 0.1 * waveHeight, 9, 0.6) +
     wave(0.3, -1, 0.08 * waveHeight, 5, 0.7) +
     wave(-1, -0.2, 0.05 * waveHeight, 2.6, 0.9)
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Stream                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export interface StreamProps {
+  /** Centreline z for a given x (world space). */
+  centerZ: (x: number) => number;
+  /** Surface height for a given (x, z). */
+  surfaceY: (x: number, z: number) => number;
+  xMin: number;
+  xMax: number;
+  halfWidth: number;
+  segments?: number;
+  deep?: string;
+  shallow?: string;
+  foam?: string;
+  opacity?: number;
+  /** Flow direction along +x (1) or −x (−1). */
+  flow?: 1 | -1;
+}
+
+/**
+ * A ribbon mesh that follows a meandering centreline, shaded with the stream
+ * shader. Cheap: no displacement, one draw call, additive-free transparency.
+ */
+export function Stream({ centerZ, surfaceY, xMin, xMax, halfWidth, segments = 96, deep = "#1d3d6a", shallow = "#5aa7d8", foam = "#eaf7ff", opacity = 0.82, flow = 1 }: StreamProps) {
+  const geometry = useMemo(() => {
+    const cols = segments + 1;
+    const positions = new Float32Array(cols * 2 * 3);
+    const uvs = new Float32Array(cols * 2 * 2);
+    const index: number[] = [];
+    for (let i = 0; i < cols; i++) {
+      const x = xMin + ((xMax - xMin) * i) / segments;
+      const zc = centerZ(x);
+      // local tangent → perpendicular so the ribbon keeps its width on bends
+      const dz = centerZ(x + 0.01) - zc;
+      const len = Math.hypot(0.01, dz);
+      const nx = -dz / len;
+      const nz = 0.01 / len;
+      for (let side = 0; side < 2; side++) {
+        const s = side === 0 ? -1 : 1;
+        const px = x + nx * halfWidth * s;
+        const pz = zc + nz * halfWidth * s;
+        const vi = (i * 2 + side) * 3;
+        positions[vi] = px;
+        positions[vi + 1] = surfaceY(px, pz);
+        positions[vi + 2] = pz;
+        const ui = (i * 2 + side) * 2;
+        uvs[ui] = i / segments;
+        uvs[ui + 1] = side;
+      }
+      if (i < segments) {
+        const a = i * 2;
+        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    g.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+    g.setIndex(index);
+    g.computeVertexNormals();
+    return g;
+  }, [centerZ, surfaceY, xMin, xMax, halfWidth, segments]);
+
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uFlow: { value: new THREE.Vector2(flow, 0) },
+      uDeep: { value: new THREE.Color(deep) },
+      uShallow: { value: new THREE.Color(shallow) },
+      uFoam: { value: new THREE.Color(foam) },
+      uOpacity: { value: opacity },
+    }),
+    [deep, shallow, foam, opacity, flow],
+  );
+
+  useFrame(({ clock }) => {
+    uniforms.uTime.value = clock.elapsedTime;
+  });
+
+  return (
+    <mesh geometry={geometry} frustumCulled={false} renderOrder={1}>
+      <shaderMaterial vertexShader={streamVertex} fragmentShader={streamFragment} uniforms={uniforms} transparent depthWrite={false} side={THREE.DoubleSide} />
+    </mesh>
   );
 }

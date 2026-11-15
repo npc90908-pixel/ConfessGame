@@ -195,6 +195,7 @@ export const useProgressStore = create<ProgressState>()(
               if (!item) return false;
               if (chapterId === "ch4" && id === "letter-from-me") return false;
               if (chapterId === "ch1" && id === "letter-first") return false;
+              if (item.category === "keepsake") return item.chapter !== chapterId;
               return !categories.has(item.category);
             }),
             objectiveProgress,

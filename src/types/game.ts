@@ -69,7 +69,8 @@ export type ItemCategory =
   | "key"
   | "fragment"
   | "letter"
-  | "gift";
+  | "gift"
+  | "keepsake";
 
 export type IconName =
   | "light"

@@ -56,6 +56,8 @@ beforeAll(() => {
 interface ExportGeometry {
   positions: number[];
   indices: number[] | null;
+  /** Optional per-vertex RGB (0–1) when the geometry carries a `color` attribute. */
+  colors?: number[];
 }
 interface ExportMesh {
   geometry: string;
@@ -172,7 +174,14 @@ describe.skipIf(!TARGET)("scene export", () => {
         }
         return; // props are not walkable surfaces
       }
-      geometries[geo.uuid] ??= { positions: Array.from(pos.array as Float32Array), indices: geo.index ? Array.from(geo.index.array as Uint16Array | Uint32Array) : null };
+      if (!geometries[geo.uuid]) {
+        const colorAttr = geo.getAttribute("color");
+        geometries[geo.uuid] = {
+          positions: Array.from(pos.array as Float32Array),
+          indices: geo.index ? Array.from(geo.index.array as Uint16Array | Uint32Array) : null,
+          colors: colorAttr && (mesh.material as THREE.MeshStandardMaterial).vertexColors ? Array.from(colorAttr.array as Float32Array) : undefined,
+        };
+      }
       meshes.push({ geometry: geo.uuid, matrices: [mesh.matrixWorld.toArray()], color: colorOf(mesh.material), double: (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material).side === THREE.DoubleSide, name: obj.name });
       raycastTargets.push(mesh);
     });

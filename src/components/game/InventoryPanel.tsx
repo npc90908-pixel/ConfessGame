@@ -16,7 +16,7 @@ const TOTALS: Record<ItemCategory, number> = Object.values(ITEMS).reduce(
     acc[item.category] += 1;
     return acc;
   },
-  { light: 0, flower: 0, memory: 0, bottle: 0, star: 0, key: 0, fragment: 0, letter: 0, gift: 0 },
+  { light: 0, flower: 0, memory: 0, bottle: 0, star: 0, key: 0, fragment: 0, letter: 0, gift: 0, keepsake: 0 },
 );
 
 export default function InventoryPanel() {

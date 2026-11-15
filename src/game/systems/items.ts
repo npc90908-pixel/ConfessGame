@@ -117,8 +117,45 @@ const gifts: InventoryItem[] = [
   },
 ];
 
+/**
+ * Optional keepsakes hidden off the main path. Finding them is never required;
+ * each one is a small extra line from the sender.
+ */
+export const KEEPSAKES: Array<InventoryItem & { chapter: "ch1" | "ch2" | "ch3" | "ch4" | "ch5"; line: string }> = [
+  {
+    id: "keepsake-ch2-nook",
+    category: "keepsake",
+    chapter: "ch2",
+    name: "Kancing Biru",
+    description: "A blue button, kept behind the hedges. From the coat you lent me when it rained.",
+    icon: "sparkles",
+    color: "#8fb8ff",
+    line: "Kamu nggak ingat, tapi aku masih menyimpan kancing ini.",
+  },
+  {
+    id: "keepsake-ch2-tree",
+    category: "keepsake",
+    chapter: "ch2",
+    name: "Daun Pertama",
+    description: "The first leaf that fell from the Memory Tree — pressed flat, still warm.",
+    icon: "sparkles",
+    color: "#ffb7d5",
+    line: "Pohon ini tumbuh dari hal-hal kecil. This leaf was the first.",
+  },
+  {
+    id: "keepsake-ch2-rocks",
+    category: "keepsake",
+    chapter: "ch2",
+    name: "Batu Sungai",
+    description: "A smooth stone from the stream. You once said flat stones carry wishes further.",
+    icon: "sparkles",
+    color: "#c9d6ff",
+    line: "Aku lempar satu untukmu. It skipped four times.",
+  },
+];
+
 export const ITEMS: Record<string, InventoryItem> = Object.fromEntries(
-  [...lights, ...flowers, ...memories, ...bottles, ...stars, ...keys, ...fragments, ...letters, ...gifts].map(
+  [...lights, ...flowers, ...memories, ...bottles, ...stars, ...keys, ...fragments, ...letters, ...gifts, ...KEEPSAKES].map(
     (item) => [item.id, item],
   ),
 );
@@ -133,6 +170,7 @@ export const CATEGORY_LABELS: Record<ItemCategory, string> = {
   fragment: "Fragmen Surat",
   letter: "Surat",
   gift: "Hadiah",
+  keepsake: "Kenang-kenangan",
 };
 
 export const CATEGORY_ORDER: ItemCategory[] = [
@@ -145,6 +183,7 @@ export const CATEGORY_ORDER: ItemCategory[] = [
   "fragment",
   "letter",
   "gift",
+  "keepsake",
 ];
 
 export function getItem(id: string): InventoryItem | undefined {
@@ -158,3 +197,4 @@ export const BOTTLE_IDS = bottles.map((i) => i.id);
 export const KEY_IDS = keys.map((i) => i.id);
 export const FRAGMENT_IDS = fragments.map((i) => i.id);
 export const STAR_IDS = stars.map((i) => i.id);
+export const KEEPSAKE_IDS = KEEPSAKES.map((i) => i.id);

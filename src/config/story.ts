@@ -192,6 +192,14 @@ export const story: StoryConfig = {
         text: "Tapi taman ini baru permulaan. Ada laut yang harus kita seberangi.",
       },
     ],
+    gardenGrove: [
+      { speaker: SENDER, text: "Pohon-pohon willow ini kutanam untuk sore-sore yang nggak kita rencanakan. The ones that just happened." },
+      { speaker: SENDER, text: "Duduklah sebentar kalau mau. Nggak ada yang buru-buru di sini." },
+    ],
+    gardenKnoll: [
+      { speaker: SENDER, text: "Dari atas sini kamu bisa lihat seluruh taman. Semua jalan kecilnya bertemu di tengah." },
+      { speaker: SENDER, text: "Begitu juga aku — every little path I took ended up leading back to you." },
+    ],
     silentOcean: [
       {
         text: "Laut itu diam. Hanya bulan dan bayangannya yang bergoyang pelan di permukaan air.",
