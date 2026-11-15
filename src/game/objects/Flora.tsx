@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { MODELS } from "@/config/models";
 import { createRng } from "@/lib/math";
 import { useQuality } from "@/game/systems/quality";
+import { applyWind, gustAt, windStrength } from "@/game/systems/wind";
 import { Model, ModelInstances, placementsToInstances, splitPlacements, type MaterialOverrides } from "./Model";
 
 const tmpObj = new THREE.Object3D();
@@ -99,13 +100,21 @@ export interface TreesProps {
   castShadow?: boolean;
   /** Extra multiplier on the kit's natural size. */
   scale?: number;
+  /** Canopy sway amount (0 = rigid). */
+  wind?: number;
 }
 
 /** Instanced Kenney trees — several model variants, palette-tinted leaves. */
-export function Trees({ placements, getHeight, trunkColor = "#6b4a3a", leafColors = ["#4f8f6a", "#3e7a5b", "#5f9f72"], variant = "round", castShadow = true, scale = 1 }: TreesProps) {
+export function Trees({ placements, getHeight, trunkColor = "#6b4a3a", leafColors = ["#4f8f6a", "#3e7a5b", "#5f9f72"], variant = "round", castShadow = true, scale = 1, wind = 0.7 }: TreesProps) {
   const set = TREE_SETS[variant];
   const buckets = useMemo(() => splitPlacements(placements, set.urls.length), [placements, set.urls.length]);
-  const overrides = useMemo<MaterialOverrides>(() => Object.fromEntries(BARK_MATERIALS.map((m) => [m, { color: trunkColor }])), [trunkColor]);
+  const overrides = useMemo<MaterialOverrides>(
+    () => ({
+      ...Object.fromEntries(BARK_MATERIALS.map((m) => [m, { color: trunkColor }])),
+      ...Object.fromEntries(LEAF_MATERIALS.map((m) => [m, { wind }])),
+    }),
+    [trunkColor, wind],
+  );
   const instanceSets = useMemo(() => buckets.map((b) => placementsToInstances(b, { getHeight, colors: leafColors })), [buckets, getHeight, leafColors]);
   return (
     <group>
@@ -121,35 +130,15 @@ export function Trees({ placements, getHeight, trunkColor = "#6b4a3a", leafColor
 /* -------------------------------------------------------------------------- */
 
 /** Instanced grass tufts that sway in the wind (vertex shader via onBeforeCompile). */
-export function GrassTufts({ placements, getHeight, color = "#5fa877", height = 0.55 }: { placements: Placement[]; getHeight: (x: number, z: number) => number; color?: string; height?: number }) {
+export function GrassTufts({ placements, getHeight, color = "#5fa877", height = 0.55, wind = 3 }: { placements: Placement[]; getHeight: (x: number, z: number) => number; color?: string; height?: number; wind?: number }) {
   const ref = useRef<THREE.InstancedMesh>(null);
-  const uniforms = useMemo(() => ({ uTime: { value: 0 } }), []);
   useInstances(ref, placements, getHeight, 0);
-  useFrame(({ clock }) => {
-    uniforms.uTime.value = clock.elapsedTime;
-  });
   const geometry = useMemo(() => {
     const g = new THREE.ConeGeometry(0.12, height, 4, 1, true);
     g.translate(0, height / 2, 0);
     return g;
   }, [height]);
-  const material = useMemo(() => {
-    const m = new THREE.MeshStandardMaterial({ color, roughness: 1, side: THREE.DoubleSide });
-    m.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime = uniforms.uTime;
-      shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nuniform float uTime;")
-        .replace(
-          "#include <begin_vertex>",
-          `#include <begin_vertex>
-          float swayK = position.y * position.y;
-          vec4 wp = instanceMatrix * vec4(position, 1.0);
-          transformed.x += sin(uTime * 1.6 + wp.x * 0.5 + wp.z * 0.3) * 0.18 * swayK;
-          transformed.z += cos(uTime * 1.3 + wp.z * 0.4) * 0.12 * swayK;`,
-        );
-    };
-    return m;
-  }, [color, uniforms]);
+  const material = useMemo(() => applyWind(new THREE.MeshStandardMaterial({ color, roughness: 1, side: THREE.DoubleSide }), wind), [color, wind]);
   return <instancedMesh ref={ref} args={[geometry, material, placements.length]} receiveShadow />;
 }
 
@@ -157,9 +146,9 @@ const FLOWER_URLS = [MODELS.natFlowerPurpleA, MODELS.natFlowerRedA, MODELS.natFl
 const PETAL_MATERIALS = ["colorPurple", "colorRed", "colorYellow"];
 
 /** Instanced Kenney flowers with palette-tinted petals. */
-export function FlowerField({ placements, getHeight, colors = ["#ff8fb8", "#ffd1e3", "#f3d08a", "#b9a7ff", "#ffffff"], stemColor = "#3f7a4e", scale = 1 }: { placements: Placement[]; getHeight: (x: number, z: number) => number; colors?: string[]; stemColor?: string; scale?: number }) {
+export function FlowerField({ placements, getHeight, colors = ["#ff8fb8", "#ffd1e3", "#f3d08a", "#b9a7ff", "#ffffff"], stemColor = "#3f7a4e", scale = 1, wind = 5 }: { placements: Placement[]; getHeight: (x: number, z: number) => number; colors?: string[]; stemColor?: string; scale?: number; wind?: number }) {
   const buckets = useMemo(() => splitPlacements(placements, FLOWER_URLS.length), [placements]);
-  const overrides = useMemo<MaterialOverrides>(() => ({ grass: { color: stemColor } }), [stemColor]);
+  const overrides = useMemo<MaterialOverrides>(() => ({ grass: { color: stemColor, wind }, ...Object.fromEntries(PETAL_MATERIALS.map((m) => [m, { wind }])) }), [stemColor, wind]);
   const instanceSets = useMemo(() => buckets.map((b) => placementsToInstances(b, { getHeight, colors })), [buckets, getHeight, colors]);
   return (
     <group>
@@ -173,9 +162,9 @@ export function FlowerField({ placements, getHeight, colors = ["#ff8fb8", "#ffd1
 const BUSH_URLS = [MODELS.natPlantBush, MODELS.natPlantBushDetailed, MODELS.natPlantBushLarge];
 
 /** Instanced low bushes. */
-export function Bushes({ placements, getHeight, color = "#3f7a4e", scale = 1 }: { placements: Placement[]; getHeight: (x: number, z: number) => number; color?: string; scale?: number }) {
+export function Bushes({ placements, getHeight, color = "#3f7a4e", scale = 1, wind = 1.5 }: { placements: Placement[]; getHeight: (x: number, z: number) => number; color?: string; scale?: number; wind?: number }) {
   const buckets = useMemo(() => splitPlacements(placements, BUSH_URLS.length), [placements]);
-  const overrides = useMemo<MaterialOverrides>(() => ({ grass: { color } }), [color]);
+  const overrides = useMemo<MaterialOverrides>(() => ({ grass: { color, wind } }), [color, wind]);
   const instanceSets = useMemo(() => buckets.map((b) => placementsToInstances(b, { getHeight })), [buckets, getHeight]);
   return (
     <group>
@@ -237,15 +226,22 @@ const LANTERN_MODELS: Record<LanternStyle, { url: string; scale: number; glows: 
 /** A lamp post (Kenney model) with a warm flickering glow. Real light optional. */
 export function Lantern({ position, color = "#ffd27a", light = false, style = "post", rotationY = 0, scale = 1 }: { position: [number, number, number]; color?: string; light?: boolean; style?: LanternStyle; rotationY?: number; scale?: number }) {
   const glow = useRef<THREE.MeshStandardMaterial>(null);
+  const swing = useRef<THREE.Group>(null);
   const seed = useMemo(() => position[0] * 1.7 + position[2] * 0.9, [position]);
   const { preset } = useQuality();
   const def = LANTERN_MODELS[style];
   useFrame(({ clock }) => {
-    if (glow.current) glow.current.emissiveIntensity = 2 + Math.sin(clock.elapsedTime * 3 + seed) * 0.4 + Math.sin(clock.elapsedTime * 7.3 + seed) * 0.15;
+    const t = clock.elapsedTime;
+    if (glow.current) glow.current.emissiveIntensity = 2 + Math.sin(t * 3 + seed) * 0.4 + Math.sin(t * 7.3 + seed) * 0.15;
+    if (swing.current && style === "hanging") {
+      const g = (gustAt(position[0], position[2], t) - 0.5) * windStrength();
+      swing.current.rotation.z = g * 0.18 + Math.sin(t * 1.7 + seed) * 0.03 * windStrength();
+      swing.current.rotation.x = Math.sin(t * 1.1 + seed) * 0.04 * windStrength();
+    }
   });
   const s = def.scale * scale;
   return (
-    <group position={position} rotation={[0, rotationY, 0]}>
+    <group ref={swing} position={position} rotation={[0, rotationY, 0]}>
       <Model url={def.url} scale={s} castShadow={preset.shadows} />
       {def.glows.map((g, i) => (
         <mesh key={i} position={[g[0] * s, g[1] * s, g[2] * s]}>

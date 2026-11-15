@@ -4,10 +4,11 @@ import { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { CONTROLS } from "@/config/controls";
-import { useSettingsStore } from "@/store/settingsStore";
+import { getAnimationIntensity, useSettingsStore } from "@/store/settingsStore";
 import { selectControlsLocked, useUIStore } from "@/store/uiStore";
 import { clamp, damp, dampAngle, lerp } from "@/lib/math";
 import { consumeLook, consumeZoom } from "../input";
+import { cameraYawBehind } from "../movement";
 import { runtime } from "../runtime";
 import { getWorld } from "../world";
 
@@ -25,6 +26,7 @@ const shakeOffset = new THREE.Vector3();
 export function CameraSystem() {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const idleTimer = useRef(0);
+  const bobPhase = useRef(0);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 30);
@@ -49,14 +51,19 @@ export function CameraSystem() {
 
       // Boat camera gently swings behind the heading when the player isn't looking around.
       if (rig.mode === "boat" && idleTimer.current > 1.2 && p.boat.throttle !== 0) {
-        rig.yaw = dampAngle(rig.yaw, p.boat.heading + Math.PI, 1.6, dt);
+        rig.yaw = dampAngle(rig.yaw, cameraYawBehind(p.boat.heading), 1.6, dt);
       } else if (rig.mode === "follow" && idleTimer.current > 2.5 && p.moving) {
-        rig.yaw = dampAngle(rig.yaw, p.yaw + Math.PI, 0.6, dt);
+        rig.yaw = dampAngle(rig.yaw, cameraYawBehind(p.yaw), 0.6, dt);
       }
 
       const height = rig.mode === "boat" ? cfg.height + 0.8 : cfg.height;
       const distance = rig.mode === "boat" ? rig.distance * 1.5 : rig.distance;
-      desiredTarget.set(p.position.x, p.position.y + height, p.position.z);
+      // Subtle head-bob while walking: follows the stride (one bob per step), fades with speed.
+      const intensity = getAnimationIntensity();
+      const walkAmount = rig.mode === "follow" && p.grounded ? clamp(p.speed / CONTROLS.player.walkSpeed, 0, 1.4) : 0;
+      bobPhase.current += (p.speed / 1.35) * Math.PI * 2 * dt;
+      const bob = Math.sin(bobPhase.current) * 0.035 * walkAmount * intensity;
+      desiredTarget.set(p.position.x, p.position.y + height + bob, p.position.z);
       const cp = Math.cos(rig.pitch);
       desiredPos.set(
         desiredTarget.x + Math.sin(rig.yaw) * cp * distance,

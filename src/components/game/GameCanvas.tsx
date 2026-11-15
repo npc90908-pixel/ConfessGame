@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { CameraSystem } from "@/game/engine/systems/CameraSystem";
 import { InteractionSystem } from "@/game/engine/systems/InteractionSystem";
 import { PlayerSystem } from "@/game/engine/systems/PlayerSystem";
+import { WindSystem } from "@/game/engine/systems/WindSystem";
 import { useLookControls } from "@/game/engine/systems/LookControls";
 import { SceneRouter } from "@/game/scenes/SceneRouter";
 import { useQuality, useQualityStore } from "@/game/systems/quality";
@@ -69,6 +70,7 @@ export function GameCanvas() {
           {phase === "playing" && <PlayerSystem />}
           <InteractionSystem />
           <CameraSystem />
+          <WindSystem />
           <Effects />
           <Preload all />
         </Suspense>

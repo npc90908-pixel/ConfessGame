@@ -11,6 +11,8 @@ interface Channel {
   key: string;
   howl: Howl;
   id: number;
+  /** Base level (0–1) before the settings volumes are applied. */
+  level: number;
 }
 
 interface SfxOptions {
@@ -40,6 +42,7 @@ class AudioManager {
   private unlocked = false;
   private musicVolume = 0.7;
   private sfxVolume = 0.9;
+  private ambientVolume = 0.7;
   private masterVolume = 0.8;
   private muted = false;
   private pendingMusic: MusicKey | null = null;
@@ -57,12 +60,14 @@ class AudioManager {
       this.masterVolume = s.masterVolume;
       this.musicVolume = s.musicVolume;
       this.sfxVolume = s.sfxVolume;
+      this.ambientVolume = s.ambientVolume;
       this.muted = s.muted;
       Howler.mute(this.muted);
       Howler.volume(this.masterVolume);
-      if (this.music) this.music.howl.volume(this.musicVolume, this.music.id);
+      if (this.music) this.music.howl.volume(this.musicVolume * this.music.level, this.music.id);
       if (this.ambient) this.ambient.howl.volume(this.ambientLevel(), this.ambient.id);
-      for (const loop of this.loops.values()) loop.howl.volume(this.sfxVolume * 0.6, loop.id);
+      // Loops keep their own level (boat speed, portal distance…) — only the setting changes.
+      for (const loop of this.loops.values()) loop.howl.volume(loop.level * this.sfxVolume, loop.id);
     };
     apply();
     useSettingsStore.subscribe(apply);
@@ -140,7 +145,7 @@ class AudioManager {
     });
     const id = howl.play();
     howl.fade(0, this.musicVolume, fade, id);
-    this.music = { key, howl, id };
+    this.music = { key, howl, id, level: 1 };
   }
 
   stopMusic(fade = MUSIC_FADE) {
@@ -158,11 +163,13 @@ class AudioManager {
   /** Briefly dip the music (used under dialogue & letters). */
   duckMusic(level = 0.45, duration = 600) {
     if (!this.music) return;
+    this.music.level = level;
     this.music.howl.fade(this.music.howl.volume(this.music.id) as number, this.musicVolume * level, duration, this.music.id);
   }
 
   unduckMusic(duration = 900) {
     if (!this.music) return;
+    this.music.level = 1;
     this.music.howl.fade(this.music.howl.volume(this.music.id) as number, this.musicVolume, duration, this.music.id);
   }
 
@@ -171,7 +178,7 @@ class AudioManager {
   /* ------------------------------------------------------------------ */
 
   private ambientLevel() {
-    return this.sfxVolume * 0.55;
+    return this.ambientVolume * 0.8;
   }
 
   playAmbient(key: AmbientKey, fade = AMBIENT_FADE) {
@@ -192,7 +199,7 @@ class AudioManager {
     const howl = new Howl({ src: audioSources(AMBIENT_TRACKS[key]), loop: true, volume: 0, preload: true });
     const id = howl.play();
     howl.fade(0, this.ambientLevel(), fade, id);
-    this.ambient = { key, howl, id };
+    this.ambient = { key, howl, id, level: 1 };
   }
 
   stopAmbient(fade = AMBIENT_FADE) {
@@ -244,12 +251,13 @@ class AudioManager {
     const howl = new Howl({ src: audioSources(SFX[key]), loop: true, volume: 0, preload: true });
     const id = howl.play();
     howl.fade(0, volume * this.sfxVolume, fade, id);
-    this.loops.set(key, { key, howl, id });
+    this.loops.set(key, { key, howl, id, level: volume });
   }
 
   setLoopVolume(key: SfxKey, volume: number) {
     const loop = this.loops.get(key);
     if (!loop) return;
+    loop.level = volume;
     loop.howl.volume(volume * this.sfxVolume, loop.id);
   }
 

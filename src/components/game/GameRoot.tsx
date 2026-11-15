@@ -7,6 +7,7 @@ import { attachKeyboard } from "@/game/engine/input";
 import { game } from "@/game/engine/GameManager";
 import { useWebGL } from "@/hooks/useWebGL";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { useSettingsStore } from "@/store/settingsStore";
 import { useUIStore } from "@/store/uiStore";
 import { BootSplash } from "./BootSplash";
 import { GameCanvas } from "./GameCanvas";
@@ -19,6 +20,12 @@ let validated = false;
 export default function GameRoot() {
   const webgl = useWebGL();
   useReducedMotion();
+  const textSize = useSettingsStore((s) => s.textSize);
+
+  // Accessibility text size is applied at the root so every rem scales.
+  useEffect(() => {
+    document.documentElement.dataset.textSize = textSize;
+  }, [textSize]);
 
   useEffect(() => {
     if (!validated) {

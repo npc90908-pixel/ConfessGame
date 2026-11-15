@@ -62,6 +62,7 @@ function QuestTracker() {
 
 function InteractionPrompt({ isTouch }: { isTouch: boolean }) {
   const prompt = useUIStore((s) => s.prompt);
+  const hints = useSettingsStore((s) => s.controlHints);
   const t = useT();
   return (
     <AnimatePresence>
@@ -79,7 +80,7 @@ function InteractionPrompt({ isTouch }: { isTouch: boolean }) {
           transition={{ duration: 0.25 }}
           onClick={() => triggerActiveInteraction()}
         >
-          {isTouch ? (
+          {isTouch || !hints ? (
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-lavender-400 text-white">
               <Icon name={prompt.icon ?? "hand"} size={18} />
             </span>
@@ -87,7 +88,7 @@ function InteractionPrompt({ isTouch }: { isTouch: boolean }) {
             <Kbd>E</Kbd>
           )}
           <span>
-            <span className="text-ink-faint">{isTouch ? t("tapHere") : t("pressE")}</span>{" "}
+            {hints && <span className="text-ink-faint">{isTouch ? t("tapHere") : t("pressE")} </span>}
             <span className="font-semibold">{prompt.label}</span>
           </span>
         </motion.button>
@@ -139,9 +140,13 @@ export function Hud() {
   const dialogue = useUIStore((s) => s.dialogue);
   const muted = useSettingsStore((s) => s.muted);
   const toggleMuted = useSettingsStore((s) => s.toggleMuted);
+  const showHud = useSettingsStore((s) => s.showHud);
   const { isTouch } = useIsMobile();
   const visible = !hudHidden && !cinematic && !overlay;
   const controlsVisible = visible && !dialogue;
+  // "Show HUD" off keeps only what is needed to keep playing: the pause
+  // button, the touch controls and the interaction prompt without its hints.
+  const minimal = !showHud;
 
   return (
     <AnimatePresence>
@@ -155,14 +160,16 @@ export function Hud() {
           transition={{ duration: 0.35 }}
         >
           {/* top-left: quest */}
-          <div className="absolute left-[max(1rem,var(--safe-left))] top-[max(1rem,var(--safe-top))]">
-            <QuestTracker />
-          </div>
+          {!minimal && (
+            <div className="absolute left-[max(1rem,var(--safe-left))] top-[max(1rem,var(--safe-top))]">
+              <QuestTracker />
+            </div>
+          )}
           {/* top-right: actions */}
           <div className="pointer-events-auto absolute right-[max(1rem,var(--safe-right))] top-[max(1rem,var(--safe-top))] flex items-center gap-2">
-            <FpsBadge />
-            <IconButton icon="bag" label={t("inventory")} onClick={() => game.toggleInventory()} />
-            <IconButton icon={muted ? "mute" : "volume"} label={t("mute")} active={muted} onClick={() => toggleMuted()} />
+            {!minimal && <FpsBadge />}
+            {!minimal && <IconButton icon="bag" label={t("inventory")} onClick={() => game.toggleInventory()} />}
+            {!minimal && <IconButton icon={muted ? "mute" : "volume"} label={t("mute")} active={muted} onClick={() => toggleMuted()} />}
             <IconButton icon="pause" label={t("paused")} onClick={() => game.pause()} />
           </div>
           {/* bottom-center: prompt + subtitles */}

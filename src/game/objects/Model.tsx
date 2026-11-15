@@ -5,6 +5,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { useQuality } from "@/game/systems/quality";
+import { applyWind } from "@/game/systems/wind";
 import type { Placement } from "./Flora";
 
 /* -------------------------------------------------------------------------- */
@@ -20,6 +21,8 @@ export type MaterialOverride = {
   metalness?: number;
   opacity?: number;
   flatShading?: boolean;
+  /** Sway amount for the shared wind field (see `systems/wind.ts`); 0/undefined = rigid. */
+  wind?: number;
 };
 export type MaterialOverrides = Record<string, MaterialOverride>;
 
@@ -74,6 +77,7 @@ export function overrideMaterial(source: THREE.Material, o?: MaterialOverride): 
     mat.transparent = o.opacity < 1;
     mat.opacity = o.opacity;
   }
+  if (o.wind) applyWind(mat, o.wind);
   mat.needsUpdate = true;
   bucket.set(key, mat);
   return mat;
@@ -236,10 +240,12 @@ const tmpColor = new THREE.Color();
 function InstancedPart({ part, instances, scale, overrides, tinted, castShadow, receiveShadow, frustumCulled }: { part: ModelPart; instances: Instance[]; scale: number; overrides?: MaterialOverrides; tinted: boolean; castShadow: boolean; receiveShadow: boolean; frustumCulled: boolean }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const material = useMemo(() => {
-    const base = overrideMaterial(part.material, overrides?.[part.name]);
+    const o = overrides?.[part.name];
+    const base = overrideMaterial(part.material, o);
     if (!tinted) return base;
-    // Instance colours multiply the material colour, so neutralise flat palettes.
-    return overrideMaterial(base, { color: "#ffffff" });
+    // Instance colours multiply the material colour, so neutralise flat palettes
+    // (clones drop onBeforeCompile, so re-request the wind patch).
+    return overrideMaterial(base, { color: "#ffffff", wind: o?.wind });
   }, [part.material, part.name, overrides, tinted]);
 
   useLayoutEffect(() => {

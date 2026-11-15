@@ -10,7 +10,7 @@ import { MODELS } from "@/config/models";
 import { Model } from "./Model";
 import { Particles } from "./Particles";
 
-export type CollectibleShape = "orb" | "flower" | "key" | "bottle" | "star" | "heart";
+export type CollectibleShape = "orb" | "flower" | "key" | "bottle" | "star" | "heart" | "keepsake";
 
 export interface CollectibleProps {
   id: string;
@@ -145,6 +145,12 @@ function Shape({ shape, color }: { shape: CollectibleShape; color: string }) {
       return <Model url={MODELS.platStar} scale={1.6} position={[0, -0.28, 0]} overrides={{ colormap: { color, emissive: color, emissiveIntensity: 1.1, roughness: 0.3 } }} castShadow={false} receiveShadow={false} />;
     case "heart":
       return <Model url={MODELS.platHeart} scale={0.75} position={[0, -0.25, 0]} overrides={{ colormap: { color, emissive: color, emissiveIntensity: 0.9, roughness: 0.25 } }} castShadow={false} receiveShadow={false} />;
+    case "keepsake":
+      return (
+        <group rotation={[0.2, 0.6, 0.1]}>
+          <Model url={MODELS.holidayPresentBRound} scale={1.1} position={[0, -0.18, 0]} overrides={{ colormap: { emissive: color, emissiveIntensity: 0.35, roughness: 0.5 } }} castShadow={false} receiveShadow={false} />
+        </group>
+      );
     case "orb":
     default:
       return (

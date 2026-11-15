@@ -115,6 +115,50 @@ describe("overlays", () => {
     );
   });
 
+  it("walks every settings tab, changes a value in each and closes back to the pause menu", async () => {
+    const settings = useSettingsStore.getState();
+    settings.resetToDefaults();
+    render(<UILayer />);
+    act(() => useUIStore.getState().openOverlay({ type: "pause" }));
+    act(() => useUIStore.getState().pushOverlay({ type: "settings", from: "pause" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((b) => b.textContent)).toEqual([t("audio"), t("graphics"), t("gameplay"), t("accessibility"), t("progress")]);
+
+    // audio
+    fireEvent.change(screen.getByLabelText(t("ambientVolume")), { target: { value: "0.25" } });
+    expect(useSettingsStore.getState().ambientVolume).toBe(0.25);
+    // graphics
+    fireEvent.click(tabs[1]);
+    fireEvent.click(screen.getByRole("button", { name: t("off") }));
+    expect(useSettingsStore.getState().shadowQuality).toBe("off");
+    fireEvent.change(screen.getByLabelText(t("particleDensity")), { target: { value: "0.5" } });
+    expect(useSettingsStore.getState().particleDensity).toBe(0.5);
+    fireEvent.click(screen.getByRole("switch", { name: new RegExp(t("postProcessing").slice(0, 10), "i") }));
+    expect(useSettingsStore.getState().postProcessing).toBe(false);
+    // gameplay
+    fireEvent.click(tabs[2]);
+    fireEvent.change(screen.getByLabelText(t("movementSensitivity")), { target: { value: "1.3" } });
+    expect(useSettingsStore.getState().movementSensitivity).toBe(1.3);
+    fireEvent.click(screen.getByRole("switch", { name: new RegExp(t("showHud").slice(0, 8), "i") }));
+    expect(useSettingsStore.getState().showHud).toBe(false);
+    // accessibility
+    fireEvent.click(tabs[3]);
+    fireEvent.click(screen.getByRole("button", { name: t("textLarge") }));
+    expect(useSettingsStore.getState().textSize).toBe("large");
+    fireEvent.change(screen.getByLabelText(t("animationIntensity")), { target: { value: "0.5" } });
+    expect(useSettingsStore.getState().animationIntensity).toBe(0.5);
+    // progress → restore defaults
+    fireEvent.click(tabs[4]);
+    fireEvent.click(screen.getByRole("button", { name: t("restoreDefaults") }));
+    expect(useSettingsStore.getState().textSize).toBe("medium");
+    expect(useSettingsStore.getState().showHud).toBe(true);
+    // close → back on the pause menu
+    fireEvent.click(screen.getByRole("button", { name: t("close") }));
+    await waitFor(() => expect(useUIStore.getState().overlay?.type).toBe("pause"));
+    useSettingsStore.setState({ language: "mix" });
+  });
+
   it("closes a closable letter from its close button", async () => {
     render(<UILayer />);
     setOverlay({ type: "letter", letterId: story.letters.firstMessage.id, closable: true });

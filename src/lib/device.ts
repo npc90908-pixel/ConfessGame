@@ -66,21 +66,20 @@ export function guessQualityTier(): QualityTier {
   return "low";
 }
 
-export const QUALITY_PRESETS: Record<
-  QualityTier,
-  {
-    dpr: [number, number];
-    shadows: boolean;
-    shadowMapSize: number;
-    bloom: boolean;
-    depthOfField: boolean;
-    ambientOcclusion: boolean;
-    vignette: boolean;
-    particleScale: number;
-    instanceScale: number;
-    anisotropy: number;
-  }
-> = {
+export interface QualityPreset {
+  dpr: [number, number];
+  shadows: boolean;
+  shadowMapSize: number;
+  bloom: boolean;
+  depthOfField: boolean;
+  ambientOcclusion: boolean;
+  vignette: boolean;
+  particleScale: number;
+  instanceScale: number;
+  anisotropy: number;
+}
+
+export const QUALITY_PRESETS: Record<QualityTier, QualityPreset> = {
   low: {
     dpr: [0.75, 1],
     shadows: false,
