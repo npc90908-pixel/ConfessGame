@@ -126,6 +126,15 @@ body {
   overscroll-behavior: none;
 }
 
+/* Accessibility → text size. Everything is rem-based, so scaling the root
+   font scales dialogue, letters, HUD and menus together. */
+html[data-text-size="small"] {
+  font-size: 93.75%;
+}
+html[data-text-size="large"] {
+  font-size: 112.5%;
+}
+
 body {
   margin: 0;
   background: var(--color-midnight-950);
@@ -224,6 +233,13 @@ canvas {
   }
   &::-webkit-scrollbar-track {
     background: transparent;
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }
 

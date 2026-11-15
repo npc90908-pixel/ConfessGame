@@ -7,12 +7,14 @@ import { audio } from "@/game/systems/audio/AudioManager";
 import { selectControlsLocked, useUIStore } from "@/store/uiStore";
 import { clamp, damp, dampAngle, lerp } from "@/lib/math";
 import { consumeAction, getMoveAxis, isActionHeld } from "../input";
+import { cameraBasis, movementResponse, yawFromDirection, type Basis } from "../movement";
 import { runtime } from "../runtime";
 import { clampToWalkable, getWorld, resolveColliders } from "../world";
 import { Character } from "@/game/objects/Character";
 
 const axis = { x: 0, y: 0 };
 const out = { x: 0, z: 0 };
+const basis: Basis = { fx: 0, fz: -1, rx: 1, rz: 0 };
 
 /**
  * Third-person kinematic character controller.
@@ -43,17 +45,14 @@ export function PlayerSystem() {
     const running = !locked && isActionHeld("run");
     const maxSpeed = running ? cfg.runSpeed : cfg.walkSpeed;
 
-    // Camera-relative basis
-    const camYaw = runtime.camera.yaw;
-    const fx = -Math.sin(camYaw);
-    const fz = -Math.cos(camYaw);
-    const rx = -fz;
-    const rz = fx;
+    // Camera-relative basis (shared convention, see engine/movement.ts)
+    const { fx, fz, rx, rz } = cameraBasis(runtime.camera.yaw, basis);
     const wantX = (fx * axis.y + rx * axis.x) * maxSpeed;
     const wantZ = (fz * axis.y + rz * axis.x) * maxSpeed;
     const hasInput = Math.abs(axis.x) + Math.abs(axis.y) > 0.01;
 
-    const accel = hasInput ? cfg.acceleration : cfg.deceleration;
+    const response = movementResponse();
+    const accel = (hasInput ? cfg.acceleration : cfg.deceleration) * response;
     p.velocity.x = lerp(p.velocity.x, wantX, damp(accel / 3, dt));
     p.velocity.z = lerp(p.velocity.z, wantZ, damp(accel / 3, dt));
     if (!hasInput && Math.hypot(p.velocity.x, p.velocity.z) < 0.05) {
@@ -63,8 +62,8 @@ export function PlayerSystem() {
 
     // Facing
     if (hasInput) {
-      const targetYaw = Math.atan2(wantX, wantZ);
-      p.yaw = dampAngle(p.yaw, targetYaw, cfg.turnSpeed, dt);
+      const targetYaw = yawFromDirection(wantX, wantZ);
+      p.yaw = dampAngle(p.yaw, targetYaw, cfg.turnSpeed * response, dt);
     }
 
     // Jump

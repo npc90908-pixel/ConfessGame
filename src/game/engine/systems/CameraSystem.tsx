@@ -8,6 +8,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { selectControlsLocked, useUIStore } from "@/store/uiStore";
 import { clamp, damp, dampAngle, lerp } from "@/lib/math";
 import { consumeLook, consumeZoom } from "../input";
+import { cameraYawBehind } from "../movement";
 import { runtime } from "../runtime";
 import { getWorld } from "../world";
 
@@ -49,9 +50,9 @@ export function CameraSystem() {
 
       // Boat camera gently swings behind the heading when the player isn't looking around.
       if (rig.mode === "boat" && idleTimer.current > 1.2 && p.boat.throttle !== 0) {
-        rig.yaw = dampAngle(rig.yaw, p.boat.heading + Math.PI, 1.6, dt);
+        rig.yaw = dampAngle(rig.yaw, cameraYawBehind(p.boat.heading), 1.6, dt);
       } else if (rig.mode === "follow" && idleTimer.current > 2.5 && p.moving) {
-        rig.yaw = dampAngle(rig.yaw, p.yaw + Math.PI, 0.6, dt);
+        rig.yaw = dampAngle(rig.yaw, cameraYawBehind(p.yaw), 0.6, dt);
       }
 
       const height = rig.mode === "boat" ? cfg.height + 0.8 : cfg.height;

@@ -10,6 +10,7 @@ import { fx } from "@/game/engine/fx";
 import { game } from "@/game/engine/GameManager";
 import { getMoveAxis } from "@/game/engine/input";
 import { triggerInteraction, useInteractable } from "@/game/engine/interactions";
+import { facingVector, movementResponse } from "@/game/engine/movement";
 import { runtime } from "@/game/engine/runtime";
 import { circle, setWorld } from "@/game/engine/world";
 import { Collectible } from "@/game/objects/Collectible";
@@ -101,6 +102,9 @@ const boatStartFor = (id: SceneId): [number, number, number] => {
 /* -------------------------------------------------------------------------- */
 
 const axis = { x: 0, y: 0 };
+const forward = { x: 0, z: 1 };
+/** Heading of the moored boat: bow towards the open sea (−z), stern at the pier. */
+const MOORED_HEADING = Math.PI;
 
 function Boat() {
   const group = useRef<THREE.Group>(null);
@@ -123,15 +127,21 @@ function Boat() {
         axis.x = 0;
         axis.y = 0;
       }
-      b.throttle = lerp(b.throttle, clamp(axis.y, -0.5, 1), damp(4, dt));
+      const response = movementResponse();
+      // W = throttle forward (the way the bow points), S = slow reverse.
+      b.throttle = lerp(b.throttle, clamp(axis.y, -0.5, 1), damp(4 * response, dt));
       const targetSpeed = b.throttle * cfg.maxSpeed;
-      b.speed = lerp(b.speed, targetSpeed, damp(targetSpeed === 0 ? cfg.drag : cfg.acceleration * 0.4, dt));
+      b.speed = lerp(b.speed, targetSpeed, damp(targetSpeed === 0 ? cfg.drag : cfg.acceleration * 0.4 * response, dt));
+      // A turns the bow to port (left of the direction of travel), D to starboard.
       const steer = -axis.x * cfg.turnSpeed * (0.35 + Math.min(1, Math.abs(b.speed) / cfg.maxSpeed) * 0.65);
-      b.turnRate = lerp(b.turnRate, steer, damp(5, dt));
+      b.turnRate = lerp(b.turnRate, steer, damp(5 * response, dt));
+      // Reversing steers like a car backing up: the stern swings towards the pressed side.
       b.heading += b.turnRate * dt * (b.speed < -0.1 ? -1 : 1);
 
-      const nx = p.position.x - Math.sin(b.heading) * b.speed * dt;
-      const nz = p.position.z - Math.cos(b.heading) * b.speed * dt;
+      // Same convention as the character: facing(yaw) = (sin yaw, cos yaw).
+      facingVector(b.heading, forward);
+      const nx = p.position.x + forward.x * b.speed * dt;
+      const nz = p.position.z + forward.z * b.speed * dt;
       // Stay inside the sailing bounds and off the rocks.
       const dxB = nx - OCEAN.boundsCenter[0];
       const dzB = nz - OCEAN.boundsCenter[2];
@@ -176,12 +186,18 @@ function Boat() {
     if (!g) return;
     const bx = driving ? p.position.x : OCEAN.boatMoor[0];
     const bz = driving ? p.position.z : OCEAN.boatMoor[2];
+    const heading = driving ? b.heading : MOORED_HEADING;
+    facingVector(heading, forward);
+    // Sample the wave slope along the hull's own axes so pitch/roll stay in
+    // the boat frame whatever the heading (Euler order YXZ: yaw → pitch → roll).
     const h = waterHeightAt(bx, bz, t);
-    const hx = waterHeightAt(bx + 1.2, bz, t);
-    const hz = waterHeightAt(bx, bz + 1.2, t);
+    const hBow = waterHeightAt(bx + forward.x * 1.6, bz + forward.z * 1.6, t);
+    const hStarboard = waterHeightAt(bx - forward.z * 0.9, bz + forward.x * 0.9, t);
+    const pitch = -Math.atan2(hBow - h, 1.6) - (driving ? b.throttle * 0.03 : 0);
+    const roll = Math.atan2(hStarboard - h, 0.9) + (driving ? b.turnRate * 0.08 : 0);
     g.position.set(bx, h + 0.22, bz);
-    const heading = driving ? b.heading : Math.PI;
-    g.rotation.set((hz - h) * 0.5 - (driving ? b.throttle * 0.03 : 0), heading, -(hx - h) * 0.5 + (driving ? b.turnRate * 0.08 : 0));
+    g.rotation.order = "YXZ";
+    g.rotation.set(pitch, heading, roll);
     if (driving) p.position.y = h + 0.5;
     if (lanternMat.current) lanternMat.current.emissiveIntensity = 1.6 + Math.sin(t * 3.1) * 0.3;
   });
@@ -200,8 +216,11 @@ function Boat() {
             const p = runtime.player;
             p.mode = "boat";
             p.position.set(OCEAN.boatMoor[0], 0.5, OCEAN.boatMoor[2]);
-            p.boat.heading = Math.PI;
+            p.boat.heading = MOORED_HEADING;
             p.boat.speed = 0;
+            p.boat.throttle = 0;
+            p.boat.turnRate = 0;
+            p.yaw = MOORED_HEADING;
             runtime.camera.mode = "boat";
             audio.sfx("whoosh", { volume: 0.6 });
             audio.startLoop("boat-loop", 0.15, 1200);
@@ -213,24 +232,25 @@ function Boat() {
 
   return (
     <group ref={group} onClick={(e) => (e.stopPropagation(), triggerInteraction("boat"))}>
-      {/* hull: Kenney row boat (bow points −z, matching the heading maths above) */}
-      <Model url={MODELS.pirateBoatRowLarge} scale={1.6} position={[0, -0.3, 0]} />
+      {/* hull: the Kenney row boat's bow points −z in model space; turned so the bow
+          faces the group's +z, which is the shared "facing" direction (engine/movement.ts) */}
+      <Model url={MODELS.pirateBoatRowLarge} scale={1.6} position={[0, -0.3, 0]} rotation={[0, Math.PI, 0]} />
       {/* invisible click target so tapping anywhere on the boat boards it */}
       <mesh visible={false}>
         <boxGeometry args={[2.2, 1.4, 4.6]} />
       </mesh>
       {/* lantern pole at the bow */}
-      <mesh position={[0, 1.2, -1.9]}>
+      <mesh position={[0, 1.2, 1.9]}>
         <cylinderGeometry args={[0.04, 0.05, 1.6, 6]} />
         <meshStandardMaterial color="#3a2a1a" />
       </mesh>
-      <mesh position={[0, 2.0, -1.9]}>
+      <mesh position={[0, 2.0, 1.9]}>
         <boxGeometry args={[0.26, 0.3, 0.26]} />
         <meshStandardMaterial ref={lanternMat} color="#ffd27a" emissive="#ffd27a" emissiveIntensity={1.6} transparent opacity={0.92} />
       </mesh>
-      <pointLight position={[0, 2.0, -1.9]} color="#ffd27a" intensity={5} distance={10} decay={2} />
-      {/* wake */}
-      <object3D ref={stern} position={[0, -0.1, 1.9]} />
+      <pointLight position={[0, 2.0, 1.9]} color="#ffd27a" intensity={5} distance={10} decay={2} />
+      {/* wake trails off the stern */}
+      <object3D ref={stern} position={[0, -0.1, -1.9]} />
       <Trail width={1.6} length={10} decay={1.2} color="#dff3ff" attenuation={(w) => w * w} target={stern as React.RefObject<THREE.Object3D>} />
     </group>
   );
@@ -469,11 +489,14 @@ export default function OceanWorld() {
     const start = boatStartFor(sceneId);
     p.mode = "boat";
     p.position.set(start[0], 0.5, start[2]);
-    p.boat.heading = Math.PI;
+    p.boat.heading = MOORED_HEADING;
     p.boat.speed = 0;
+    p.boat.throttle = 0;
+    p.boat.turnRate = 0;
+    p.yaw = MOORED_HEADING;
     p.visible = true;
     runtime.camera.mode = "boat";
-    runtime.camera.snapBehind(p.position, Math.PI);
+    runtime.camera.snapBehind(p.position, MOORED_HEADING);
     audio.startLoop("boat-loop", 0.15, 1200);
   }, [sceneId, transitionActive, phase]);
 

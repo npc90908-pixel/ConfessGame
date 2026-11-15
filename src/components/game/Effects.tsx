@@ -1,13 +1,15 @@
 "use client";
 
-import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Bloom, DepthOfField, EffectComposer, N8AO, ToneMapping, Vignette } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import type { DepthOfFieldEffect } from "postprocessing";
+import * as THREE from "three";
 import { runtime } from "@/game/engine/runtime";
 import { useQuality } from "@/game/systems/quality";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { useSettingsStore } from "@/store/settingsStore";
 
 /**
  * Selective post-processing. Bloom is the signature of the art direction and
@@ -16,8 +18,18 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
  */
 export function Effects() {
   const { preset, tier } = useQuality();
+  const enabled = useSettingsStore((s) => s.postProcessing);
   const reduced = useReducedMotion();
   const dof = useRef<DepthOfFieldEffect>(null);
+  const gl = useThree((s) => s.gl);
+
+  // The composer owns tone mapping while it is mounted; hand it back to the
+  // renderer when the player switches post-processing off.
+  useEffect(() => {
+    if (enabled) return;
+    gl.toneMapping = THREE.ACESFilmicToneMapping;
+    gl.toneMappingExposure = 1.0;
+  }, [enabled, gl]);
 
   useFrame(() => {
     if (!dof.current) return;
@@ -28,6 +40,8 @@ export function Effects() {
     dof.current.cocMaterial.worldFocusDistance = dist;
     dof.current.cocMaterial.worldFocusRange = Math.max(6, dist * 1.2);
   });
+
+  if (!enabled) return null;
 
   return (
     <EffectComposer multisampling={tier === "high" ? 4 : 0} enableNormalPass={false} resolutionScale={tier === "low" ? 0.75 : 1}>
